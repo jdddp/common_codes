@@ -1,0 +1,10 @@
+model:
+  onnx_path: "./weights/best_int8.onnx"
+  device: "cpu"
+
+infer:
+  imgsz: 640
+  conf_thres: 0.2
+  iou_thres: 0.5
+  vis: True
+  vis_dir: "D:\\projects\\20260429FishCounter\\datasets\\datasets_img_pow_test_singlemode"

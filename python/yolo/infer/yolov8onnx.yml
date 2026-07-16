@@ -1,0 +1,20 @@
+#重影檢測
+CY:
+  device: "cpu"                    # or "gpu"
+  weightPath: "./models/cy0702.onnx"
+  img_size: 640                     # 输入图像尺寸
+  conf_threshold: 0.2              # 检测置信度阈值
+  iou_threshold: 0.45               # NMS IoU 阈值
+  classes: ["cy", "yq", "zl"]
+  conf_list: [0.2, 0.2, 0.2]
+  visible_classes: ["cy", "yq", "zl"]  # 只显示这些类别
+
+CY2:
+  device: "cpu"                    # or "gpu"
+  weightPath: "./models/0629cy.onnx"
+  img_size: 640                     # 输入图像尺寸
+  conf_threshold: 0.2              # 检测置信度阈值
+  iou_threshold: 0.45               # NMS IoU 阈值
+  classes: ["cy", "yq", "zl"]
+  conf_list: [0.2, 0.2, 0.2]
+  visible_classes: ["cy", "yq", "zl"]  # 只显示这些类别

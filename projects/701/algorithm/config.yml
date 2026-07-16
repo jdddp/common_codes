@@ -1,0 +1,21 @@
+# yolo_config.yml
+model:
+  device: "cpu"
+  weightPath: "./algorithm/701v1.onnx"
+  img_size: 640
+  conf_threshold: 0.2
+  iou_threshold: 0.45
+  classes: ["target"]
+  conf_list: [0.2]
+  visible_classes: ["target"]
+
+logistic:
+  max_lost: 3
+  iou_threshold: 0.01
+  scale_ratio: 3
+  min_length_small: 3
+  min_length_large: 5  #判断长度
+  max_deviation_ratio: 0.3 #下降趋势
+  start_y: 50 #最小起始距离
+  alarm_y: 80 #这个位置，哪怕误判也得报了
+  min_move_distance: 10 #最小移动距离

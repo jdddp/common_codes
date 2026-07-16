@@ -1,0 +1,1 @@
+yolo detect train data=/suanfa-1/jzp/0002_dataset/0000_blade/EX_test_od/ultralytics-main/ultralytics/cfg/datasets/coco.yaml model=/suanfa-1/jzp/0002_dataset/0000_blade/EX_test_od/yolov8s.pt epochs=20 imgsz=640 device=1 workers=0 mosaic=0.0 scale=0.0 lr0=0.001
