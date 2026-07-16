@@ -27,6 +27,9 @@ python ./onnx2rknn/yolo_rknn.py
     - ./tools/librknnrt.so
 
 ### 参考内容
+- https://github.com/airockchip/ultralytics_yolov8
+- https://github.com/airockchip/ultralytics_yolov8/blob/main/RKOPT_README.zh-CN.md
+- https://github.com/airockchip/rknn_model_zoo
 - https://blog.csdn.net/GREEN_cq/article/details/141607095
 - https://blog.csdn.net/A_l_b_ert/article/details/140822319
 - https://blog.csdn.net/GREEN_cq/article/details/141607095

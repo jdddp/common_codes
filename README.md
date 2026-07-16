@@ -31,6 +31,16 @@ C++ 通用模块与基础算法，主要包含：
 
 `projects/` 可复用的套件。
 
+### `注意事項`
+1. **yolo26導出**: 
+   1.  支持端到端推理，包括 ONNX、TensorRT、CoreML、OpenVINO、LiteRT 和 MNN。 
+       - (N, 300, 6)
+       - [x1, y1, x2, y2, conf, class_id]
+  
+   2. 不支持 端到端，并会自动回退到一对多头：NCNN、RKNN、PaddlePaddle、ExecuTorch、IMX、Edge TPU 和 Qualcomm QNN。 (N, nc + 4, 8400)
+      - (N, nc + 4, 8400)
+      - 每个锚点的框坐标 + 类别得分;xywh
+
 ### `projects/`
 
 按具体业务问题归档的专项工程，通常是“入口脚本 + 算法实现 + 配置 / 模型”的组合。和上面的 `python/hdy/parse_file/` 相比，更偏向具体任务验证，技术路线也更垂直。
