@@ -166,7 +166,7 @@ class Model(nn.Module):
         output_names = ["reg1", "cls1", "reg2", "cls2", "reg3", "cls3"]
         os.makedirs('./weights', exist_ok=True)
         torch.onnx.export(self.model, dummy_input, \
-                           "./rknn_use.onnx",\
+                           "./lh_2cls.onnx",\
                               verbose=False, input_names=input_names, output_names=output_names, opset_version=9)
         print("============onnx export finished=========== ")
 

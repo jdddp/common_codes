@@ -69,7 +69,7 @@ class YOLOv8Exporter:
     """
     将 YOLOv8 ONNX 模型导出为 RKNN 模型。
     """
-    def __init__(self, onnx_path, rknn_path, dataset_path, quantize=False, target_platform='rk3588'):
+    def __init__(self, onnx_path, rknn_path, dataset_path, quantize=True, target_platform='rk3588'):
         self.onnx_path = onnx_path
         self.rknn_path = rknn_path
         self.dataset_path = dataset_path
@@ -250,15 +250,23 @@ def draw_results(image, results, class_names):
 
 if __name__ == '__main__':
     # Default paths
-    ONNX_PATH = './ultralytics-rk3399/rknn_use.onnx'
-    RKNN_PATH = './ultralytics-rk3399/rknn_use.rknn'
-    DATASET_PATH = './tools/onnx2rknn/dataset.txt'
-    IMG_PATH = './test/src_imgs'
+    ONNX_PATH = './ultralytics-rk3399/v37_logo.onnx'
+    RKNN_PATH = './ultralytics-rk3399/rknn_use3588.rknn'
+    ONNX_PATH = './ultralytics-rk3399/lh_2cls.onnx'
+    RKNN_PATH = './ultralytics-rk3399/lh_2cls3588.rknn'
+
+
+    DATASET_PATH = './onnx2rknn/imagelist_lh.txt'
+    # IMG_PATH = './onnx2rknn/src_quant_dataset'
+    IMG_PATH = './onnx2rknn/train'
+
     OUTPUT_IMAGE_PATH = './test/rknn_infer'
     os.makedirs(OUTPUT_IMAGE_PATH, exist_ok=True)
-    TARGET_PLATFORM = 'rk3576'
-    INPUT_SIZE = (1216, 1216)
-    CLASSES = ['sed_404', 'sed_bjtl','sed_high', 'sed_jltl', 'sed_low', 'sed_lpc', 'sed_qtj', 'sed_sd', 'sed_special']
+    TARGET_PLATFORM = 'rk3588'
+    INPUT_SIZE = (640, 640)
+    # CLASSES = ['fish2', 'yq', 'zl','hdy']
+    CLASSES = ['sl', 'slb']
+
     
 
     # --- 步骤 1: 导出 ONNX 到 RKNN (如果需要) ---

@@ -1,9 +1,0 @@
-conv_49
-conv_52
-conv_55
-conv_58
-conv_61
-conv_64
-conv_65
-softmax_1
-sigmoid_0

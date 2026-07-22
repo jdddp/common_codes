@@ -1,6 +1,6 @@
 
 from ultralytics import YOLO
-model = YOLO(r"D:\projects\2026\YOLO\ultralytics\runs\v3_7_cy\weights\best.pt")
+model = YOLO("/home/poly/jzp/ultralytics/v2_2_lh/weights/best.pt")
 
 '''
 ./ultralytics/engine/model.py

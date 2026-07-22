@@ -1,3 +1,8 @@
 /cpp库/
 /python/hdy/
 /cpp库.zip
+/python/yolo/pt2rknn/onnx2rknn/src_quant_dataset/
+/python/yolo/pt2rknn/onnx2rknn/train/
+/python/yolo/pt2rknn/test/
+*rknn
+*onnx
