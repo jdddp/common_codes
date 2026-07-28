@@ -136,19 +136,18 @@ bool YoloV8::load(const std::string& param,
     return true;
 }
 
-// // ---------------- load ----------------
-// bool YoloV8::load(const std::string& param,
+// ---------------- load ----------------
+//bool YoloV8::load(const std::string& param,
 //    const std::string& bin,
 //    bool use_gpu)
-// {
+//{
 //    // 线程数和是否启用 Vulkan 在这里统一配置。
 //    net.opt.num_threads = 4;
 //    net.opt.use_vulkan_compute = use_gpu;
-
+//
 //    return net.load_param(param.c_str()) == 0 &&
 //        net.load_model(bin.c_str()) == 0;
-// }
-
+//}
 
 
 // ---------------- preprocess ----------------
