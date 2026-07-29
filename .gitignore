@@ -7,3 +7,6 @@
 *.rknn
 *.onnx
 *.png
+*.npy
+*.npz
+/python/utils/tvg/mblyy/
