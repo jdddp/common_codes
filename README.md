@@ -2,8 +2,6 @@
 
 声纳图像处理、YOLO 推理与部署的通用代码库。内容包含可独立验证的业务项目，以及可被其他项目复用的 Python／C++ 推理与图像处理模块。
 
-> 这不是单一可一键构建的应用程序。各项目有自己的模型、数据与运行环境；请先阅读下方的“开始使用”与“注意事项”。
-
 ## 内容一览
 
 | 路径 | 用途 | 主要技术 |
@@ -84,7 +82,7 @@ python main.py
 
 ### C++ 项目
 
-C++ 示例主要是原型或集成用代码，尚未提供统一的 CMake／Make 构建配置。至少需要 OpenCV；根据使用的检测后端，另需 NCNN、RKNN Runtime 或对应 NPU SDK。部分示例入口包含 `windows.h`，在 Linux 上构建前需调整平台相关代码。
+C++ 示例主要是原型或集成用代码，未提供统一的 CMake／Make 构建配置。至少需要 OpenCV；根据使用的检测后端，另需 NCNN、RKNN Runtime 或对应 NPU SDK。部分示例入口包含 `windows.h`，在 Linux 上构建前需调整平台相关代码。
 
 ## YOLO 与模型部署
 
@@ -103,6 +101,6 @@ YOLO26 导出格式需注意：端到端后端输出为 `(N, 300, 6)`，每行�
 
 ## 阅读顺序
 
-1. 业务验证：先看 `projects/701/` 或 `projects/fish_counter/`。
+1. 业务验证： `projects/701/` 或 `projects/fish_counter/`。
 2. 集成 C++ 端推理：从 `cpp/yolo/` 选择目标后端，再参考 `remove_ghost` 的集成方式。
 3. 训练或部署数据：查看 `python/yolo/data_process/` 与 `python/yolo/pt2rknn/`。
