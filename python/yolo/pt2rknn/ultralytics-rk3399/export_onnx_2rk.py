@@ -1,6 +1,6 @@
 
 from ultralytics import YOLO
-model = YOLO("/home/poly/jzp/ultralytics/v2_2_lh/weights/best.pt")
+model = YOLO("/home/poly/jzp/common_codes/python/yolo/pt2rknn/ultralytics-rk3399/20260803cy_logo.pt")
 
 '''
 ./ultralytics/engine/model.py

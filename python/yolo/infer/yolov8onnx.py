@@ -59,22 +59,37 @@ class YOLOV8ONNX:
     #  前處理                                                               #
     # ------------------------------------------------------------------ #
 
-    def _preprocess(self, img_bgr: np.ndarray) -> np.ndarray:
-        """
-        Letterbox 縮放：等比例縮放到 imgsz，其餘填黑。
-        同時記錄縮放比例 self.ratio 供後處理還原座標使用。
-        """
+    def _preprocess(self, img_bgr):
         h, w = img_bgr.shape[:2]
-        self.ratio = self.imgsz / max(h, w)
-        new_w, new_h = int(w * self.ratio), int(h * self.ratio)
+
+        self.ratio = min(self.imgsz / h, self.imgsz / w)
+
+        new_w = int(round(w * self.ratio))
+        new_h = int(round(h * self.ratio))
 
         resized = cv2.resize(img_bgr, (new_w, new_h))
-        canvas  = np.zeros((self.imgsz, self.imgsz, 3), dtype=np.uint8)
-        canvas[:new_h, :new_w] = resized
 
-        # BGR → RGB，歸一化，HWC → CHW，增加 batch 維度
+        self.dw = (self.imgsz - new_w) / 2
+        self.dh = (self.imgsz - new_h) / 2
+
+        left = int(round(self.dw - 0.1))
+        right = int(round(self.dw + 0.1))
+        top = int(round(self.dh - 0.1))
+        bottom = int(round(self.dh + 0.1))
+
+        canvas = cv2.copyMakeBorder(
+            resized,
+            top,
+            bottom,
+            left,
+            right,
+            cv2.BORDER_CONSTANT,
+            value=(114, 114, 114),
+        )
+
         blob = canvas[:, :, ::-1].astype(np.float32) / 255.0
-        blob = np.transpose(blob, (2, 0, 1))[np.newaxis]
+        blob = np.transpose(blob, (2, 0, 1))[None]
+
         return blob
 
     # ------------------------------------------------------------------ #
@@ -86,6 +101,7 @@ class YOLOV8ONNX:
         raw shape: (1, 4+num_cls, num_anchors)  ← YOLOv8 輸出格式
         回傳過濾後的檢測結果列表。
         """
+        # print(raw.shape)
         pred = np.squeeze(raw)          # (4+num_cls, num_anchors)
         pred = np.transpose(pred, (1, 0))  # (num_anchors, 4+num_cls)
 
@@ -95,6 +111,7 @@ class YOLOV8ONNX:
         pred       = np.concatenate([pred, conf[:, None]], axis=-1)  # 追加 conf 欄
 
         boxes = self._nms(pred)
+
         return self._decode_boxes(boxes)
 
     def _nms(self, pred: np.ndarray) -> list[np.ndarray]:
@@ -133,10 +150,14 @@ class YOLOV8ONNX:
                 cls_boxes = rest[ious <= self.iou]
 
             for box in keep:
-                box_out = box[:6].copy()
-                box_out[5] = cls_id
-                output.append(box_out)
-
+                output.append(np.array([
+                    box[0],      # cx
+                    box[1],      # cy
+                    box[2],      # w
+                    box[3],      # h
+                    box[-1],     # conf
+                    cls_id
+                ], dtype=np.float32))
         return output
 
     @staticmethod
@@ -167,16 +188,17 @@ class YOLOV8ONNX:
             cls_id   = int(box[5])
             conf     = float(box[4])
             category = self.id2label.get(cls_id, "unknown")
-
+            # print(self.visible_classes)
             if category not in self.visible_classes:
                 continue
             if conf < self.conf_lst[cls_id]:
                 continue
 
-            x1 = max(int((box[0] - box[2] / 2) / self.ratio), 0)
-            y1 = max(int((box[1] - box[3] / 2) / self.ratio), 0)
-            x2 = min(int((box[0] + box[2] / 2) / self.ratio), W)
-            y2 = min(int((box[1] + box[3] / 2) / self.ratio), H)
+            x1 = int((box[0] - box[2]/2 - self.dw) / self.ratio)
+            y1 = int((box[1] - box[3]/2 - self.dh) / self.ratio)
+
+            x2 = int((box[0] + box[2]/2 - self.dw) / self.ratio)
+            y2 = int((box[1] + box[3]/2 - self.dh) / self.ratio)
 
             if x2 <= x1 or y2 <= y1:
                 continue
@@ -229,10 +251,10 @@ class YOLOV8ONNX:
             img_bgr = cv2.cvtColor(img_src, cv2.COLOR_GRAY2BGR)
         else:
             img_bgr = img_src
-
         blob        = self._preprocess(img_bgr)
         raw         = self.session.run(None, {self.input_name: blob})[0]
         detections  = self._postprocess(raw)
         result_img  = self._draw(img_bgr, detections) if draw else img_bgr.copy()
 
         return result_img, detections
+

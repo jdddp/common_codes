@@ -250,22 +250,22 @@ def draw_results(image, results, class_names):
 
 if __name__ == '__main__':
     # Default paths
-    ONNX_PATH = './ultralytics-rk3399/v37_logo.onnx'
-    RKNN_PATH = './ultralytics-rk3399/rknn_use3588.rknn'
-    ONNX_PATH = './ultralytics-rk3399/lh_2cls.onnx'
-    RKNN_PATH = './ultralytics-rk3399/lh_2cls3588.rknn'
+    # ONNX_PATH = './ultralytics-rk3399/v37_logo.onnx'
+    # RKNN_PATH = './ultralytics-rk3399/rknn_use3588.rknn'
+    ONNX_PATH = './ultralytics-rk3399/20260803cy_logo.onnx'
+    RKNN_PATH = './ultralytics-rk3399/20260803cy_logo.rknn'
 
 
-    DATASET_PATH = './onnx2rknn/imagelist_lh.txt'
+    DATASET_PATH = './onnx2rknn/imagelist_cy.txt'
     # IMG_PATH = './onnx2rknn/src_quant_dataset'
-    IMG_PATH = './onnx2rknn/train'
+    IMG_PATH = './onnx2rknn/cy'
 
     OUTPUT_IMAGE_PATH = './test/rknn_infer'
     os.makedirs(OUTPUT_IMAGE_PATH, exist_ok=True)
     TARGET_PLATFORM = 'rk3588'
     INPUT_SIZE = (640, 640)
-    # CLASSES = ['fish2', 'yq', 'zl','hdy']
-    CLASSES = ['sl', 'slb']
+    CLASSES = ['fish2', 'yq', 'zl','hdy']
+    # CLASSES = ['sl', 'slb']
 
     
 

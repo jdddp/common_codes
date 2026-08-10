@@ -1,17 +1,21 @@
 #include "yolov8_ncnn.h"
+#include "qaesencryption.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <fstream>
-#include <vector>
-#include <string>
-
 #include <cstring>
-#include <fstream>
 #include <iterator>
+#include <string>
 #include <vector>
+
+#include <QByteArray>
+#include <QCryptographicHash>
 
 namespace {
-    const unsigned char kXorKey[] = "poly@2026_jdddp";
+    constexpr size_t kMagicLen = 8;
+    constexpr size_t kIvLen = 16;
+    const char kMagic[] = "QTAESv01";
 
     std::vector<unsigned char> read_binary_file(const std::string& path)
     {
@@ -25,17 +29,60 @@ namespace {
             std::istreambuf_iterator<char>());
     }
 
-    std::vector<unsigned char> xor_crypt(const std::vector<unsigned char>& data)
+    QByteArray sha256(const QByteArray& data)
     {
-        std::vector<unsigned char> out = data;
-        const size_t key_len = sizeof(kXorKey) - 1;
+        return QCryptographicHash::hash(data, QCryptographicHash::Sha256);
+    }
 
-        for (size_t i = 0; i < out.size(); ++i) {
-            out[i] ^= kXorKey[i % key_len] ^
-                static_cast<unsigned char>((i * 131 + 17) & 0xFF);
+    QByteArray derive_aes_key()
+    {
+        QByteArray passphrase("poly::2026::jdddp::ncnn::qtaes::cbc::pkcs7");
+        QByteArray salt("poly_qtaes@2026#jdddp$ncnn%secure");
+        QByteArray reversed_passphrase = passphrase;
+        std::reverse(reversed_passphrase.begin(), reversed_passphrase.end());
+
+        const QByteArray round1 = sha256(passphrase);
+        const QByteArray round2 = sha256(salt + round1 + reversed_passphrase);
+        return sha256(round1 + "::" + salt + "::" + round2 + "::model_protect");
+    }
+
+    std::vector<unsigned char> aes_cbc_decrypt(
+        const std::vector<unsigned char>& encrypted)
+    {
+        if (encrypted.size() <= kMagicLen + kIvLen) {
+            return {};
         }
 
-        return out;
+        if (std::memcmp(encrypted.data(), kMagic, kMagicLen) != 0) {
+            return {};
+        }
+
+        const QByteArray key = derive_aes_key();
+        const QByteArray iv(
+            reinterpret_cast<const char*>(encrypted.data() + kMagicLen),
+            static_cast<int>(kIvLen));
+        const QByteArray ciphertext(
+            reinterpret_cast<const char*>(encrypted.data() + kMagicLen + kIvLen),
+            static_cast<int>(encrypted.size() - kMagicLen - kIvLen));
+
+        if (ciphertext.isEmpty() || (ciphertext.size() % 16) != 0) {
+            return {};
+        }
+
+        QAESEncryption aes(
+            QAESEncryption::AES_256,
+            QAESEncryption::CBC,
+            QAESEncryption::PKCS7);
+        const QByteArray decrypted_with_padding = aes.decode(ciphertext, key, iv);
+        const QByteArray decrypted = aes.removePadding(decrypted_with_padding);
+
+        if (decrypted.isEmpty()) {
+            return {};
+        }
+
+        const unsigned char* begin =
+            reinterpret_cast<const unsigned char*>(decrypted.constData());
+        return std::vector<unsigned char>(begin, begin + decrypted.size());
     }
 }
 
@@ -80,8 +127,17 @@ bool YoloV8::load(const std::string& param,
     std::cout << "[YoloV8::load] encrypted_bin.size="
         << encrypted_bin.size() << std::endl;
 
-    const std::vector<unsigned char> decrypted_param_bytes = xor_crypt(encrypted_param);
-    const std::vector<unsigned char> decrypted_bin_bytes = xor_crypt(encrypted_bin);
+    const std::vector<unsigned char> decrypted_param_bytes =
+        aes_cbc_decrypt(encrypted_param);
+    const std::vector<unsigned char> decrypted_bin_bytes =
+        aes_cbc_decrypt(encrypted_bin);
+    if (decrypted_param_bytes.empty() || decrypted_bin_bytes.empty()) {
+        std::cout << "[YoloV8::load] QAESEncryption AES-CBC decrypt failed."
+            << " decrypted_param_bytes.size=" << decrypted_param_bytes.size()
+            << " decrypted_bin_bytes.size=" << decrypted_bin_bytes.size()
+            << std::endl;
+        return false;
+    }
 
     std::cout << "[YoloV8::load] decrypted_param_bytes.size="
         << decrypted_param_bytes.size() << std::endl;

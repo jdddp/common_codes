@@ -9,4 +9,7 @@
 *.png
 *.npy
 *.npz
-/python/utils/tvg/mblyy/
+/python/image_enhanced/mblyy/
+*enc 
+*bin
+*param
