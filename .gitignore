@@ -10,6 +10,8 @@
 *.npy
 *.npz
 /python/image_enhanced/mblyy/
-*enc 
-*bin
-*param
+**/model.ncnn.bin
+**/model.ncnn.param
+**/model.param.enc
+**/model.bin.enc
+/nanodet/runs/
