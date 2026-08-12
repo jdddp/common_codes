@@ -44,7 +44,30 @@ Per-class metrics for best.pt (100/100):
 
 ## 0.2 coco2017数据集val 8：2 切的训练结果对比：官方（上）、复现（下）
 ~~~bash
+#官方：训练30s/epcoh、验证4s/epoch
+YOLOv8 summary: 130 layers, 3,157,200 parameters, 3,157,184 gradients, 8.9 GFLOPs
+YOLOv8 summary (fused): 73 layers, 3,151,904 parameters, 0 gradients, 8.7 GFLOPs
+          Class     Images  Instances      Box(P          R      mAP50  mAP50-95)
+            all       1000       7388     0.263     0.0999      0.071     0.0344
+      airplane         23         29      0.303       0.31      0.216     0.0812
+          apple        15         51      0.124     0.0196     0.0244     0.0145
+      backpack         43         83          0          0    0.00494    0.00113
+        banana         16         21     0.0496     0.0476     0.0302     0.0191
+  baseball bat         10         10          1          0   0.000329   3.29e-05
+baseball glove         14         19          0          0     0.0148     0.0108
+          bear          7         13      0.226      0.308      0.173      0.119
+            bed         27         28      0.188      0.357      0.221      0.122
+#复现：训练36s/epcoh、验证6s/epoch
 Classes: 80 | Params: 3,149,112 | Gradients: 3,149,112 | GFLOPs@640: 8.32
+                                class        P        R          mAP50   mAP50-95    valid
+                                  all   0.1826      0.1588      0.1160     0.0685     True
+                              airplane   0.2194     0.3103      0.2051     0.1158     True
+                                apple   0.1253      0.0787      0.0397     0.0251     True
+                              backpack   0.0483     0.0120      0.0076     0.0035     True
+                                banana   0.0195     0.0476      0.0071     0.0034     True
+                          baseball bat   0.0000     0.0000      0.0064     0.0027     True
+                        baseball glove   0.1643     0.1579      0.1112     0.0657     True
+                                  bear   0.3042     0.5385      0.4626     0.3288     True
 
 ~~~
 
