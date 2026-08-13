@@ -11,11 +11,20 @@ class TaskAlignedAssigner:
         self.alpha = alpha
         self.beta = beta
 
-    def _select_topk_candidates(self, metrics: torch.Tensor, mask_in_gts: torch.Tensor) -> torch.Tensor:
+    # def _select_topk_candidates(self, metrics: torch.Tensor, mask_in_gts: torch.Tensor) -> torch.Tensor:
+    #     topk = min(self.topk, metrics.shape[-1])
+    #     candidate_metrics = metrics.masked_fill(~mask_in_gts, -1e8)
+    #     topk_metrics, topk_idx = candidate_metrics.topk(topk, dim=-1, largest=True)
+    #     topk_mask = topk_metrics > self.eps
+    #     selected = torch.zeros_like(metrics, dtype=torch.bool)
+    #     selected.scatter_(-1, topk_idx, topk_mask)
+    #     return selected
+
+    def _select_topk_candidates(self, metrics, mask_in_gts):
         topk = min(self.topk, metrics.shape[-1])
         candidate_metrics = metrics.masked_fill(~mask_in_gts, -1e8)
         topk_metrics, topk_idx = candidate_metrics.topk(topk, dim=-1, largest=True)
-        topk_mask = topk_metrics > self.eps
+        topk_mask = (topk_metrics.max(-1, keepdim=True).values > self.eps).expand(-1, -1, topk)
         selected = torch.zeros_like(metrics, dtype=torch.bool)
         selected.scatter_(-1, topk_idx, topk_mask)
         return selected
