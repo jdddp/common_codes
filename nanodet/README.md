@@ -25,8 +25,8 @@
 ~~~bash
 #官方：训练12s/epcoh、验证6.5s/epoch
 YOLOv8 summary (fused): 73 layers, 3,006,428 parameters, 0 gradients, 8.1 GFLOPs
-      Class     Box(P          R      mAP50  mAP50-95)
-        all     0.862      0.845      0.902      0.648
+      Class     Box(P          R      mAP50    mAP50-95)
+        all     0.862      0.845    <<0.902      0.648>>
       cate1     0.734      0.841      0.864      0.501
       cate2     0.843      0.643      0.805      0.477
       cate3     0.874      0.895      0.942      0.639
@@ -35,7 +35,7 @@ YOLOv8 summary (fused): 73 layers, 3,006,428 parameters, 0 gradients, 8.1 GFLOPs
 Classes: 4 | Params: 3,130,644 | Gradients: 3,130,644 | GFLOPs@640: 8.22
 Per-class metrics for best.pt (100/100):
       class        P         R        mAP50    mAP50-95
-        all    0.8752     0.8385      0.8968     0.6840 
+        all    0.8752     0.8385    <<0.8968     0.6840>> 
       cate1    0.8022     0.7444      0.8490     0.5204 
       cate2    0.7963     0.6917      0.7859     0.5016
       cate3    0.9030     0.9179      0.9574     0.7213
@@ -47,27 +47,26 @@ Per-class metrics for best.pt (100/100):
 #官方：训练30s/epcoh、验证4s/epoch
 YOLOv8 summary: 130 layers, 3,157,200 parameters, 3,157,184 gradients, 8.9 GFLOPs
 YOLOv8 summary (fused): 73 layers, 3,151,904 parameters, 0 gradients, 8.7 GFLOPs
-          Class     Images  Instances      Box(P          R      mAP50  mAP50-95)
-            all       1000       7388     0.263     0.0999      0.071     0.0344
-      airplane         23         29      0.303       0.31      0.216     0.0812
-          apple        15         51      0.124     0.0196     0.0244     0.0145
-      backpack         43         83          0          0    0.00494    0.00113
-        banana         16         21     0.0496     0.0476     0.0302     0.0191
-  baseball bat         10         10          1          0   0.000329   3.29e-05
-baseball glove         14         19          0          0     0.0148     0.0108
-          bear          7         13      0.226      0.308      0.173      0.119
-            bed         27         28      0.188      0.357      0.221      0.122
+          Class      Box(P          R      mAP50  mAP50-95)
+            all      0.263     0.0999    <<0.071     0.0344>>
+      airplane       0.303       0.31      0.216     0.0812
+          apple      0.124     0.0196      0.0244     0.0145
+      backpack          0          0       0.00494    0.00113
+        banana       0.0496     0.0476     0.0302     0.0191
+  baseball bat          1          0       0.000329   3.29e-05
+baseball glove          0          0       0.0148     0.0108
+          bear       0.226      0.308      0.173      0.119
 #复现：训练36s/epcoh、验证6s/epoch
 Classes: 80 | Params: 3,149,112 | Gradients: 3,149,112 | GFLOPs@640: 8.32
-                                class        P        R          mAP50   mAP50-95    valid
-                                  all   0.1826      0.1588      0.1160     0.0685     True
-                              airplane   0.2194     0.3103      0.2051     0.1158     True
-                                apple   0.1253      0.0787      0.0397     0.0251     True
-                              backpack   0.0483     0.0120      0.0076     0.0035     True
-                                banana   0.0195     0.0476      0.0071     0.0034     True
-                          baseball bat   0.0000     0.0000      0.0064     0.0027     True
-                        baseball glove   0.1643     0.1579      0.1112     0.0657     True
-                                  bear   0.3042     0.5385      0.4626     0.3288     True
+            class        P        R          mAP50   mAP50-95 
+              all    0.1826     0.1588    <<0.1160     0.0685>>
+          airplane   0.2194     0.3103      0.2051     0.1158
+            apple    0.1253     0.0787      0.0397     0.0251
+          backpack   0.0483     0.0120      0.0076     0.0035
+            banana   0.0195     0.0476      0.0071     0.0034 
+      baseball bat   0.0000     0.0000      0.0064     0.0027 
+    baseball glove   0.1643     0.1579      0.1112     0.0657
+              bear   0.3042     0.5385      0.4626     0.3288
 
 ~~~
 
@@ -262,15 +261,18 @@ python3 export_onnx.py \
 - `cls_s32`
 
 这样做的目的是让后处理可以在 NCNN / RKNN 端独立实现，避免把 decode 和 NMS 硬编码进图里。
+~~~bash
+python3 export_onnx.py --config configs/yolov8n_example.yaml --weights runs/yolov8n_scratch/best.pt --output yolov8_raw.onnx --format official(可選)
+~~~
 
 ## 6. NCNN 部署
 
 ### 6.1 ONNX 转 NCNN
 
-准备好 `pnnx` 后执行：
+准备好 `pnnx` 后，輸入onnx路徑，执行：
 
 ```bash
-bash deploy/ncnn/convert_ncnn.sh yolov8n_style.onnx /path/to/pnnx/bin deploy/ncnn/out
+bash deploy/ncnn/convert_ncnn.sh 
 ```
 
 ### 6.2 NCNN 推理示例

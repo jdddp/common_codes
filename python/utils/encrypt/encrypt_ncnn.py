@@ -8,8 +8,6 @@ import os
 
 KEY = b"poly@2026_jdddp"
 
-
-
 def xor_crypt(data: bytes) -> bytes:
     key_len = len(KEY)
     out = bytearray(data)
