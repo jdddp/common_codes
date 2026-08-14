@@ -104,11 +104,16 @@ class YOLOv8Loss(nn.Module):
             dfl = self._dfl_loss(pred_dist[fg_mask].view(-1, 4, self.reg_max), target_ltrb)
             total_dfl = (dfl.sum(dim=1) * weight).sum() / target_scores_sum
 
+        # loss = (
+        #     self.box_weight * total_box / batch_size
+        #     + self.cls_weight * total_cls / batch_size
+        #     + self.dfl_weight * total_dfl / batch_size
+        # )
         loss = (
-            self.box_weight * total_box / batch_size
-            + self.cls_weight * total_cls / batch_size
-            + self.dfl_weight * total_dfl / batch_size
-        )
+            self.box_weight * total_box 
+            + self.cls_weight * total_cls
+            + self.dfl_weight * total_dfl 
+        )* batch_size
         return {
             "loss": loss,
             "box_loss": total_box / batch_size,

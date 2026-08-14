@@ -13,7 +13,7 @@ loss:
 train:
   image_size: 640
   epochs: 100
-  batch_size: 16
+  batch_size: 48
   num_workers: 8
   persistent_workers: true
   prefetch_factor: 4
@@ -62,10 +62,10 @@ augment:
   border_value: [114, 114, 114]
 
 dataset:
-  train_images: "D:/projects/20260525chongying/anno/fishing20260702_logo/src_yolo/images/train"
-  train_labels: "D:/projects/20260525chongying/anno/fishing20260702_logo/src_yolo/labels/train"
-  val_images: "D:/projects/20260525chongying/anno/fishing20260702_logo/src_yolo/images/val"
-  val_labels: "D:/projects/20260525chongying/anno/fishing20260702_logo/src_yolo/labels/val"
+  train_images: "/home/poly/jzp/src_yolo/images/train"
+  train_labels: "/home/poly/jzp/src_yolo/labels/train"
+  val_images: "/home/poly/jzp/src_yolo/images/val"
+  val_labels: "/home/poly/jzp/src_yolo/labels/val"
   names:
     - fish2
     - zl
