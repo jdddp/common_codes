@@ -18,6 +18,9 @@ class YOLOv8Loss(nn.Module):
         box_weight: float = 7.5,
         cls_weight: float = 0.5,
         dfl_weight: float = 1.5,
+        assigner_topk: int = 10,
+        assigner_alpha: float = 0.5,
+        assigner_beta: float = 6.0,
     ) -> None:
         super().__init__()
         self.num_classes = num_classes
@@ -26,7 +29,11 @@ class YOLOv8Loss(nn.Module):
         self.box_weight = box_weight
         self.cls_weight = cls_weight
         self.dfl_weight = dfl_weight
-        self.assigner = TaskAlignedAssigner()
+        self.assigner = TaskAlignedAssigner(
+            topk=assigner_topk,
+            alpha=assigner_alpha,
+            beta=assigner_beta,
+        )
         self.bce = nn.BCEWithLogitsLoss(reduction="none")
         self._anchor_cache = {}
 

@@ -586,6 +586,9 @@ def main():
         box_weight=config.get("loss", {}).get("box_weight", 7.5),
         cls_weight=config.get("loss", {}).get("cls_weight", 1.0),
         dfl_weight=config.get("loss", {}).get("dfl_weight", 1.5),
+        assigner_topk=config.get("assigner", {}).get("topk", 10),
+        assigner_alpha=config.get("assigner", {}).get("alpha", 0.5),
+        assigner_beta=config.get("assigner", {}).get("beta", 6.0),
     )
     optimizer, base_accumulate, scaled_weight_decay, optimizer_name = build_optimizer(model, config)
     scheduler = build_scheduler(optimizer, config)

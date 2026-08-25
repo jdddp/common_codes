@@ -1,3 +1,9 @@
+优化记录:
+- **multiscale** ×
+- optime **TAl** √
+- **dfl down** √：0.25为步长，0.5处最优
+- boxloss down ？：实验不充分
+
 ### official
 ~~~bash
 YOLOv8 summary (fused): 73 layers, 3,006,428 parameters, 0 gradients, 8.1 GFLOPs
@@ -10,14 +16,15 @@ YOLOv8 summary (fused): 73 layers, 3,006,428 parameters, 0 gradients, 8.1 GFLOPs
 Speed: 0.1ms preprocess, 0.5ms inference, 0.0ms loss, 0.8ms postprocess per image
 ~~~
 ### self
-优化记录:
-- **multiscale** ×
-- optime **TAl** √
-- **dfl down** √：0.25为步长，0.5处最优
-- boxloss down ？：实验不充分
-
-
-bs48---optime TAl---boxloss down(可)---dfl（0.25） down（不可）
+錯誤：bs48---optime TAl---boxloss down(45)---dfl（0.5） down（可）
+~~~bash
+           class        P        R    mAP50   mAP50-95    valid
+             all   0.9128   0.8750   0.9246     0.6977     True
+           fish2   0.8579   0.7695   0.8867     0.5419     True
+              zl   0.8656   0.8008   0.8504     0.5447     True
+              yq   0.9284   0.9296   0.9662     0.7125     Tru      
+~~~
+錯誤：bs48---optime TAl---boxloss down(可)---dfl（0.25） down（不可）
 ~~~bash
 Per-class metrics for best.pt (100/100):
            class        P        R    mAP50   mAP50-95    valid
@@ -29,7 +36,7 @@ Per-class metrics for best.pt (100/100):
 saved curves to runs\yolov8n_parammatch_cy_optim-tal_boxloss-down_dfl-down3
 ~~~
 
-bs48---optime TAl---boxloss down(可)---dfl（0.5） down（可）
+正確：bs48---optime TAl---boxloss down(可)---dfl（0.5） down（可）
 ~~~bash
 Per-class metrics for best.pt (100/100):
            class        P        R    mAP50   mAP50-95    valid

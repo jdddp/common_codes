@@ -6,9 +6,14 @@ model:
   strides: [8, 16, 32]
 
 loss:
-  box_weight: 7.5
+  box_weight: 5.5 #7.5
   cls_weight: 1.0
-  dfl_weight: 1.5
+  dfl_weight: 0.5 #1.5
+
+assigner:
+  topk: 15
+  alpha: 0.5
+  beta: 5.0
 
 train:
   image_size: 640
