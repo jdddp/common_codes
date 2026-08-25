@@ -9,6 +9,26 @@ YOLOv8 summary (fused): 73 layers, 3,006,428 parameters, 0 gradients, 8.1 GFLOPs
     hdy       0.995          1      0.995      0.976
 Speed: 0.1ms preprocess, 0.5ms inference, 0.0ms loss, 0.8ms postprocess per image
 ~~~
+### self
+优化记录:
+- **multiscale** ×
+- optime **TAl** √
+- **dfl down** √：0.25为步长，0.5处最优
+- boxloss down ？：实验不充分
+
+
+bs48---optime TAl---boxloss down(可)---dfl（0.25） down（不可）
+~~~bash
+Per-class metrics for best.pt (100/100):
+           class        P        R    mAP50   mAP50-95    valid
+             all   0.9221   0.8747   0.9265     0.7048     True
+           fish2   0.8687   0.7739   0.8912     0.5551     True
+              zl   0.8818   0.7855   0.8539     0.5594     True
+              yq   0.9385   0.9395   0.9661     0.7117     True
+             hdy   0.9992   1.0000   0.9950     0.9931     True
+saved curves to runs\yolov8n_parammatch_cy_optim-tal_boxloss-down_dfl-down3
+~~~
+
 bs48---optime TAl---boxloss down(可)---dfl（0.5） down（可）
 ~~~bash
 Per-class metrics for best.pt (100/100):
