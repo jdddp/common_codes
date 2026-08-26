@@ -21,6 +21,7 @@ class YOLOv8Loss(nn.Module):
         assigner_topk: int = 10,
         assigner_alpha: float = 0.5,
         assigner_beta: float = 6.0,
+        assigner_debug: bool = False,
     ) -> None:
         super().__init__()
         self.num_classes = num_classes
@@ -29,6 +30,7 @@ class YOLOv8Loss(nn.Module):
         self.box_weight = box_weight
         self.cls_weight = cls_weight
         self.dfl_weight = dfl_weight
+        self.assigner_debug = assigner_debug
         self.assigner = TaskAlignedAssigner(
             topk=assigner_topk,
             alpha=assigner_alpha,
@@ -85,6 +87,7 @@ class YOLOv8Loss(nn.Module):
             gt_labels,
             gt_boxes,
             self.num_classes,
+            return_debug_stats=self.assigner_debug,
         )
         target_scores = assigned["target_scores"].to(dtype=pred_scores.dtype)
         fg_mask = assigned["fg_mask"]
@@ -121,10 +124,13 @@ class YOLOv8Loss(nn.Module):
             + self.cls_weight * total_cls
             + self.dfl_weight * total_dfl 
         )* batch_size
-        return {
+        result = {
             "loss": loss,
             "box_loss": total_box / batch_size,
             "cls_loss": total_cls / batch_size,
             "dfl_loss": total_dfl / batch_size,
             "num_pos": num_pos,
         }
+        if self.assigner_debug and "debug_stats" in assigned:
+            result["assigner_debug"] = assigned["debug_stats"]
+        return result

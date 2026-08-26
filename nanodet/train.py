@@ -3,6 +3,7 @@ import copy
 import csv
 import random
 import time
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -434,6 +435,9 @@ def train_one_epoch(
 ):
     model.train()
     running = {"loss": 0.0, "box_loss": 0.0, "cls_loss": 0.0, "dfl_loss": 0.0}
+    debug_cfg = config.get("debug", {})
+    debug_assigner = bool(debug_cfg.get("assigner_stats", False))
+    debug_interval = max(int(debug_cfg.get("assigner_log_interval", 50)), 1)
     instance_count = 0
     current_imgsz = config["train"]["image_size"]
     current_accumulate = base_accumulate
@@ -491,16 +495,38 @@ def train_one_epoch(
 
         for key in running:
             running[key] += loss_items[key].item()
-        pbar.set_postfix(
-            gpu_mem=get_gpu_mem(device),
-            box=f"{loss_items['box_loss'].item():.4f}",
-            cls=f"{loss_items['cls_loss'].item():.4f}",
-            dfl=f"{loss_items['dfl_loss'].item():.4f}",
-            instances=batch_instances,
-            imgsz=current_imgsz,
-            lr=f"{get_current_lr(optimizer):.6f}",
-            acc=current_accumulate,
-        )
+        postfix = {
+            "gpu_mem": get_gpu_mem(device),
+            "box": f"{loss_items['box_loss'].item():.4f}",
+            "cls": f"{loss_items['cls_loss'].item():.4f}",
+            "dfl": f"{loss_items['dfl_loss'].item():.4f}",
+            "instances": batch_instances,
+            "imgsz": current_imgsz,
+            "lr": f"{get_current_lr(optimizer):.6f}",
+            "acc": current_accumulate,
+        }
+        assigner_debug = loss_items.get("assigner_debug")
+        if debug_assigner and assigner_debug:
+            postfix.update(
+                {
+                    "pos/gt": f"{assigner_debug['avg_pos_per_gt'].item():.2f}",
+                    "mgt": f"{assigner_debug['matched_gt_ratio'].item():.2f}",
+                    "aiou": f"{assigner_debug['avg_iou'].item():.3f}",
+                    "aaln": f"{assigner_debug['avg_alignment'].item():.5f}",
+                }
+            )
+            if batch_idx == 0 or (batch_idx + 1) % debug_interval == 0:
+                print(
+                    f"[assigner] epoch={epoch + 1} batch={batch_idx + 1}/{num_batches} "
+                    f"valid_gt={assigner_debug['num_valid_gt'].item():.0f} "
+                    f"fg={assigner_debug['num_fg'].item():.0f} "
+                    f"pos_per_gt={assigner_debug['avg_pos_per_gt'].item():.2f} "
+                    f"matched_gt_ratio={assigner_debug['matched_gt_ratio'].item():.2f} "
+                    f"avg_iou={assigner_debug['avg_iou'].item():.4f} "
+                    f"avg_alignment={assigner_debug['avg_alignment'].item():.6f} "
+                    f"avg_norm_alignment={assigner_debug['avg_norm_alignment'].item():.4f}"
+                )
+        pbar.set_postfix(**postfix)
 
     num_batches = max(len(loader), 1)
     results = {k: v / num_batches for k, v in running.items()}
@@ -589,6 +615,7 @@ def main():
         assigner_topk=config.get("assigner", {}).get("topk", 10),
         assigner_alpha=config.get("assigner", {}).get("alpha", 0.5),
         assigner_beta=config.get("assigner", {}).get("beta", 6.0),
+        assigner_debug=bool(config.get("debug", {}).get("assigner_stats", False)),
     )
     optimizer, base_accumulate, scaled_weight_decay, optimizer_name = build_optimizer(model, config)
     scheduler = build_scheduler(optimizer, config)
@@ -600,6 +627,7 @@ def main():
 
     out_dir = Path(config["train"]["out_dir"])
     results_file = ensure_results_file(out_dir)
+    shutil.copy(args.config, results_file.parent / "config.yaml")
     per_class_results_file = per_class_results_path(out_dir)
     print_train_overview(config, model, train_loader, val_loader, device)
     best_map = -1.0

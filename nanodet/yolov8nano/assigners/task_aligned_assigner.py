@@ -52,6 +52,41 @@ class TaskAlignedAssigner:
         norm_align = pos_align_metrics * gt_max_iou / (gt_max_align + self.eps)
         return norm_align.max(dim=1).values.clamp_(0.0, 1.0)
 
+    def _build_debug_stats(
+        self,
+        alignment: torch.Tensor,
+        overlaps: torch.Tensor,
+        mask_pos: torch.Tensor,
+        gt_mask: torch.Tensor,
+        fg_mask: torch.Tensor,
+        normalized_alignment: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        valid_gt = gt_mask.bool()
+        pos_per_gt = mask_pos.sum(dim=-1).float()
+        matched_gt = (pos_per_gt > 0) & valid_gt
+        pos_values = mask_pos
+        num_valid_gt = valid_gt.sum()
+        num_pos = pos_values.sum()
+
+        zero = alignment.new_tensor(0.0)
+        avg_pos_per_gt = pos_per_gt[valid_gt].mean() if num_valid_gt.item() > 0 else zero
+        matched_gt_ratio = matched_gt.float().sum() / num_valid_gt.float().clamp(min=1.0)
+        avg_iou = overlaps[pos_values].mean() if num_pos.item() > 0 else zero
+        avg_alignment = alignment[pos_values].mean() if num_pos.item() > 0 else zero
+        avg_norm_alignment = normalized_alignment[fg_mask].mean() if fg_mask.any() else zero
+        fg_ratio = fg_mask.float().mean()
+
+        return {
+            "num_valid_gt": num_valid_gt.detach(),
+            "num_fg": fg_mask.sum().detach(),
+            "avg_pos_per_gt": avg_pos_per_gt.detach(),
+            "matched_gt_ratio": matched_gt_ratio.detach(),
+            "avg_iou": avg_iou.detach(),
+            "avg_alignment": avg_alignment.detach(),
+            "avg_norm_alignment": avg_norm_alignment.detach(),
+            "fg_ratio": fg_ratio.detach(),
+        }
+
     def _bbox_iou_batch(self, gt_boxes: torch.Tensor, pred_boxes: torch.Tensor) -> torch.Tensor:
         inter_x1 = torch.maximum(gt_boxes[..., 0:1], pred_boxes[:, None, :, 0])
         inter_y1 = torch.maximum(gt_boxes[..., 1:2], pred_boxes[:, None, :, 1])
@@ -82,6 +117,7 @@ class TaskAlignedAssigner:
         gt_labels: torch.Tensor,
         gt_boxes: torch.Tensor,
         num_classes: int,
+        return_debug_stats: bool = False,
     ) -> Dict[str, torch.Tensor]:
         squeeze_batch = pred_scores.dim() == 2
         if squeeze_batch:
@@ -107,8 +143,23 @@ class TaskAlignedAssigner:
                 "target_scores": target_scores,
                 "fg_mask": fg_mask,
             }
+            if return_debug_stats:
+                zero = pred_scores.new_tensor(0.0)
+                result["debug_stats"] = {
+                    "num_valid_gt": zero,
+                    "num_fg": zero,
+                    "avg_pos_per_gt": zero,
+                    "matched_gt_ratio": zero,
+                    "avg_iou": zero,
+                    "avg_alignment": zero,
+                    "avg_norm_alignment": zero,
+                    "fg_ratio": zero,
+                }
             if squeeze_batch:
-                return {key: value.squeeze(0) for key, value in result.items()}
+                squeezed = {key: value.squeeze(0) for key, value in result.items() if key != "debug_stats"}
+                if "debug_stats" in result:
+                    squeezed["debug_stats"] = result["debug_stats"]
+                return squeezed
             return result
 
         pred_scores_fp32 = pred_scores.float()
@@ -147,6 +198,18 @@ class TaskAlignedAssigner:
             "target_scores": target_scores,
             "fg_mask": fg_mask,
         }
+        if return_debug_stats:
+            result["debug_stats"] = self._build_debug_stats(
+                alignment=alignment,
+                overlaps=ious,
+                mask_pos=mask_pos,
+                gt_mask=gt_mask,
+                fg_mask=fg_mask,
+                normalized_alignment=normalized_alignment,
+            )
         if squeeze_batch:
-            return {key: value.squeeze(0) for key, value in result.items()}
+            squeezed = {key: value.squeeze(0) for key, value in result.items() if key != "debug_stats"}
+            if "debug_stats" in result:
+                squeezed["debug_stats"] = result["debug_stats"]
+            return squeezed
         return result
