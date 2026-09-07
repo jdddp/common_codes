@@ -22,6 +22,7 @@ class YOLOv8Loss(nn.Module):
         assigner_alpha: float = 0.5,
         assigner_beta: float = 6.0,
         assigner_debug: bool = False,
+        cls_target_mode: str = "soft_label",
     ) -> None:
         super().__init__()
         self.num_classes = num_classes
@@ -31,6 +32,13 @@ class YOLOv8Loss(nn.Module):
         self.cls_weight = cls_weight
         self.dfl_weight = dfl_weight
         self.assigner_debug = assigner_debug
+        valid_cls_target_modes = {"soft_label", "hard_label", "soft_weight"}
+        if cls_target_mode not in valid_cls_target_modes:
+            raise ValueError(
+                f"Unsupported cls_target_mode: {cls_target_mode}. "
+                f"Expected one of {sorted(valid_cls_target_modes)}."
+            )
+        self.cls_target_mode = cls_target_mode
         self.assigner = TaskAlignedAssigner(
             topk=assigner_topk,
             alpha=assigner_alpha,
@@ -38,6 +46,29 @@ class YOLOv8Loss(nn.Module):
         )
         self.bce = nn.BCEWithLogitsLoss(reduction="none")
         self._anchor_cache = {}
+
+    def _build_cls_targets(
+        self,
+        target_labels: torch.Tensor,
+        fg_mask: torch.Tensor,
+        soft_target_scores: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        cls_targets = soft_target_scores
+        cls_loss_weight = soft_target_scores.new_ones((soft_target_scores.shape[0], soft_target_scores.shape[1], 1))
+        cls_normalizer = soft_target_scores.sum().clamp(min=1.0)
+
+        if self.cls_target_mode in {"hard_label", "soft_weight"}:
+            clamped_labels = target_labels.clamp(min=0)
+            cls_targets = F.one_hot(clamped_labels, num_classes=self.num_classes).to(dtype=soft_target_scores.dtype)
+            cls_targets = cls_targets * fg_mask.unsqueeze(-1).to(dtype=soft_target_scores.dtype)
+
+        if self.cls_target_mode == "hard_label":
+            cls_normalizer = fg_mask.sum().clamp(min=1).to(dtype=soft_target_scores.dtype)
+        elif self.cls_target_mode == "soft_weight":
+            cls_loss_weight = soft_target_scores.sum(dim=-1, keepdim=True).clamp(min=1e-6)
+            cls_normalizer = soft_target_scores.sum().clamp(min=1.0)
+
+        return cls_targets, cls_loss_weight, cls_normalizer
 
     def _get_anchors(self, feats: List[torch.Tensor]):
         key = (
@@ -89,12 +120,13 @@ class YOLOv8Loss(nn.Module):
             self.num_classes,
             return_debug_stats=self.assigner_debug,
         )
+        target_labels = assigned["target_labels"]
         target_scores = assigned["target_scores"].to(dtype=pred_scores.dtype)
         fg_mask = assigned["fg_mask"]
         target_boxes = assigned["target_boxes"].to(dtype=pred_boxes.dtype)
         target_scores_sum = target_scores.sum().clamp(min=1.0)
-
-        total_cls = self.bce(pred_scores, target_scores).sum() / target_scores_sum
+        cls_targets, cls_loss_weight, cls_normalizer = self._build_cls_targets(target_labels, fg_mask, target_scores)
+        total_cls = (self.bce(pred_scores, cls_targets) * cls_loss_weight).sum() / cls_normalizer
         total_box = pred_scores.new_tensor(0.0)
         total_dfl = pred_scores.new_tensor(0.0)
         num_pos = fg_mask.sum()
@@ -133,4 +165,5 @@ class YOLOv8Loss(nn.Module):
         }
         if self.assigner_debug and "debug_stats" in assigned:
             result["assigner_debug"] = assigned["debug_stats"]
+        result["cls_target_mode"] = self.cls_target_mode
         return result

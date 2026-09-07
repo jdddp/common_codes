@@ -9,6 +9,7 @@ loss:
   box_weight: 5.5 #7.5
   cls_weight: 1.0
   dfl_weight: 0.5 #1.5
+  cls_target_mode: hard_label  # soft_label | hard_label | soft_weight
 
 assigner:
   topk: 15
