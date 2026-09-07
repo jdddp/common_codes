@@ -1,0 +1,72 @@
+<view class="borrow-container">
+    <view class="device-info">
+        <view class="info-title">设备信息</view>
+        <view class="info-item">
+            <text class="info-label">设备名称</text>
+            <text class="info-value">{{deviceName}}</text>
+        </view>
+        <view class="info-item">
+            <text class="info-label">可用数量</text>
+            <text class="info-value text-success">{{availableQuantity}}</text>
+        </view>
+    </view>
+
+    <view class="borrow-form">
+        <view class="input-group">
+            <view class="input-label">借用数量 <text class="required">*</text></view>
+            <input
+                class="input-field"
+                type="number"
+                placeholder="请输入借用数量"
+                value="{{quantity}}"
+                bindinput="onQuantityInput"
+            />
+            <view class="input-hint">最多可借 {{availableQuantity}} 台</view>
+        </view>
+
+        <view class="input-group">
+            <view class="input-label">预计归还时间</view>
+            <picker
+                mode="date"
+                value="{{expectedReturnTime}}"
+                start="{{today}}"
+                bindchange="onDateChange"
+            >
+                <view class="input-field picker-field">
+                    {{expectedReturnTime || '请选择日期'}}
+                </view>
+            </picker>
+        </view>
+
+        <view class="input-group">
+            <view class="input-label">借用用途</view>
+            <input
+                class="input-field"
+                placeholder="请输入借用用途（选填）"
+                value="{{purpose}}"
+                bindinput="onPurposeInput"
+            />
+        </view>
+
+        <view class="input-group">
+            <view class="input-label">备注</view>
+            <textarea
+                class="input-field textarea-field"
+                placeholder="请输入备注（选填）"
+                value="{{remark}}"
+                bindinput="onRemarkInput"
+            />
+        </view>
+    </view>
+
+    <view class="submit-section">
+        <button
+            class="btn-primary submit-btn"
+            bindtap="onSubmit"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+        >
+            确认借用
+        </button>
+    </view>
+</view>

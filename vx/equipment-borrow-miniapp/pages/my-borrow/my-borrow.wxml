@@ -1,0 +1,92 @@
+<view class="my-borrow-container">
+    <view class="tab-bar">
+        <view
+            class="tab-item {{currentTab === '' ? 'active' : ''}}"
+            bindtap="onTabTap"
+            data-tab=""
+        >
+            全部
+        </view>
+        <view
+            class="tab-item {{currentTab === 'borrowing' ? 'active' : ''}}"
+            bindtap="onTabTap"
+            data-tab="borrowing"
+        >
+            借用中
+        </view>
+        <view
+            class="tab-item {{currentTab === 'partially_returned' ? 'active' : ''}}"
+            bindtap="onTabTap"
+            data-tab="partially_returned"
+        >
+            部分归还
+        </view>
+        <view
+            class="tab-item {{currentTab === 'returned' ? 'active' : ''}}"
+            bindtap="onTabTap"
+            data-tab="returned"
+        >
+            已归还
+        </view>
+    </view>
+
+    <view class="borrow-list">
+        <view
+            wx:for="{{borrowings}}"
+            wx:key="_id"
+            class="borrow-card"
+        >
+            <view class="borrow-header">
+                <view class="device-name">{{item.deviceName}}</view>
+                <view class="borrow-status status-{{item.status}}">
+                    {{item.statusText}}
+                </view>
+            </view>
+
+            <view class="borrow-info">
+                <view class="info-row">
+                    <text class="info-label">借用数量</text>
+                    <text class="info-value">{{item.quantity}}</text>
+                </view>
+                <view class="info-row">
+                    <text class="info-label">已归还</text>
+                    <text class="info-value">{{item.returnedQuantity}}</text>
+                </view>
+                <view class="info-row">
+                    <text class="info-label">待归还</text>
+                    <text class="info-value text-warning">{{item.quantity - item.returnedQuantity}}</text>
+                </view>
+            </view>
+
+            <view class="borrow-time">
+                <view class="time-item">
+                    <text class="time-label">借用时间</text>
+                    <text class="time-value">{{item.borrowTimeText}}</text>
+                </view>
+                <view class="time-item" wx:if="{{item.expectedReturnTime}}">
+                    <text class="time-label">预计归还</text>
+                    <text class="time-value">{{item.expectedReturnTimeText}}</text>
+                </view>
+            </view>
+
+            <view class="borrow-action" wx:if="{{item.status === 'borrowing' || item.status === 'partially_returned'}}">
+                <button
+                    class="btn-primary return-btn"
+                    bindtap="onReturnTap"
+                    data-borrow="{{item}}"
+                >
+                    归还
+                </button>
+            </view>
+        </view>
+
+        <view class="empty-state" wx:if="{{borrowings.length === 0 && !loading}}">
+            <view class="empty-icon">📭</view>
+            <view class="empty-text">暂无借用记录</view>
+        </view>
+    </view>
+
+    <view class="loading-more" wx:if="{{loading}}">
+        <view class="loading-text">加载中...</view>
+    </view>
+</view>

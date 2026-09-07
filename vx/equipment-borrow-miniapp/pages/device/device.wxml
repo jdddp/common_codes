@@ -1,0 +1,80 @@
+<view class="device-container">
+    <view class="search-bar">
+        <input
+            class="search-input"
+            placeholder="搜索设备"
+            value="{{keyword}}"
+            bindinput="onSearchInput"
+            bindconfirm="onSearch"
+        />
+        <view class="search-btn" bindtap="onSearch">搜索</view>
+    </view>
+
+    <view class="category-filter">
+        <scroll-view scroll-x class="category-scroll">
+            <view
+                class="category-item {{currentCategory === '' ? 'active' : ''}}"
+                bindtap="onCategoryTap"
+                data-id=""
+            >
+                全部
+            </view>
+            <view
+                wx:for="{{categories}}"
+                wx:key="_id"
+                class="category-item {{currentCategory === item._id ? 'active' : ''}}"
+                bindtap="onCategoryTap"
+                data-id="{{item._id}}"
+            >
+                {{item.name}}
+            </view>
+        </scroll-view>
+    </view>
+
+    <view class="device-list">
+        <view
+            wx:for="{{devices}}"
+            wx:key="_id"
+            class="device-card"
+            bindtap="onDeviceTap"
+            data-device="{{item}}"
+        >
+            <view class="device-header">
+                <view class="device-name">{{item.name}}</view>
+                <view class="device-status {{item.status === 'active' ? 'status-active' : 'status-disabled'}}">
+                    {{item.status === 'active' ? '可用' : '已禁用'}}
+                </view>
+            </view>
+
+            <view class="device-info">
+                <view class="info-item">
+                    <text class="info-label">总数</text>
+                    <text class="info-value">{{item.totalQuantity}}</text>
+                </view>
+                <view class="info-item">
+                    <text class="info-label">已借</text>
+                    <text class="info-value text-warning">{{item.borrowedQuantity}}</text>
+                </view>
+                <view class="info-item">
+                    <text class="info-label">可用</text>
+                    <text class="info-value text-success">{{item.availableQuantity}}</text>
+                </view>
+            </view>
+
+            <view class="device-action" wx:if="{{item.status === 'active' && item.availableQuantity > 0}}">
+                <button class="btn-primary borrow-btn" catchtap="onBorrowTap" data-device="{{item}}">
+                    借用
+                </button>
+            </view>
+        </view>
+
+        <view class="empty-state" wx:if="{{devices.length === 0 && !loading}}">
+            <view class="empty-icon">📭</view>
+            <view class="empty-text">暂无设备</view>
+        </view>
+    </view>
+
+    <view class="loading-more" wx:if="{{loading}}">
+        <view class="loading-text">加载中...</view>
+    </view>
+</view>

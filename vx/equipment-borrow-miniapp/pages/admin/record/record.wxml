@@ -1,0 +1,97 @@
+<view class="admin-record-container">
+    <view class="filter-section">
+        <view class="filter-row">
+            <view class="filter-item">
+                <picker
+                    range="{{statusOptions}}"
+                    range-key="label"
+                    value="{{statusIndex}}"
+                    bindchange="onStatusChange"
+                >
+                    <view class="filter-field">
+                        {{statusOptions[statusIndex].label}}
+                    </view>
+                </picker>
+            </view>
+            <view class="filter-item">
+                <picker
+                    mode="date"
+                    value="{{startDate}}"
+                    bindchange="onStartDateChange"
+                >
+                    <view class="filter-field">
+                        {{startDate || '开始日期'}}
+                    </view>
+                </picker>
+            </view>
+            <view class="filter-item">
+                <picker
+                    mode="date"
+                    value="{{endDate}}"
+                    bindchange="onEndDateChange"
+                >
+                    <view class="filter-field">
+                        {{endDate || '结束日期'}}
+                    </view>
+                </picker>
+            </view>
+        </view>
+    </view>
+
+    <view class="record-list">
+        <view
+            wx:for="{{records}}"
+            wx:key="_id"
+            class="record-card"
+        >
+            <view class="record-header">
+                <view class="device-name">{{item.deviceName}}</view>
+                <view class="record-status status-{{item.status}}">
+                    {{item.statusText}}
+                </view>
+            </view>
+
+            <view class="record-info">
+                <view class="info-row">
+                    <text class="info-label">借用数量</text>
+                    <text class="info-value">{{item.quantity}}</text>
+                </view>
+                <view class="info-row">
+                    <text class="info-label">已归还</text>
+                    <text class="info-value">{{item.returnedQuantity}}</text>
+                </view>
+                <view class="info-row">
+                    <text class="info-label">待归还</text>
+                    <text class="info-value text-warning">{{item.quantity - item.returnedQuantity}}</text>
+                </view>
+            </view>
+
+            <view class="record-user">
+                <view class="user-item">
+                    <text class="user-label">借用人</text>
+                    <text class="user-value">{{item.userName}} ({{item.userPhone}})</text>
+                </view>
+                <view class="user-item" wx:if="{{item.userDepartment}}">
+                    <text class="user-label">部门</text>
+                    <text class="user-value">{{item.userDepartment}}</text>
+                </view>
+            </view>
+
+            <view class="record-time">
+                <view class="time-item">
+                    <text class="time-label">借用时间</text>
+                    <text class="time-value">{{item.borrowTimeText}}</text>
+                </view>
+            </view>
+        </view>
+
+        <view class="empty-state" wx:if="{{records.length === 0 && !loading}}">
+            <view class="empty-icon">📭</view>
+            <view class="empty-text">暂无记录</view>
+        </view>
+    </view>
+
+    <view class="loading-more" wx:if="{{loading}}">
+        <view class="loading-text">加载中...</view>
+    </view>
+</view>

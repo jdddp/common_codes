@@ -1,0 +1,143 @@
+.admin-user-container {
+    min-height: 100vh;
+    background-color: #f5f5f5;
+}
+
+.header-section {
+    background-color: white;
+    padding: 20rpx;
+    margin-bottom: 20rpx;
+}
+
+.search-bar {
+    display: flex;
+}
+
+.search-input {
+    flex: 1;
+    height: 72rpx;
+    border: 1rpx solid #d9d9d9;
+    border-radius: 8rpx;
+    padding: 0 20rpx;
+    font-size: 28rpx;
+}
+
+.add-btn {
+    width: 160rpx;
+    height: 72rpx;
+    line-height: 72rpx;
+    font-size: 26rpx;
+    margin-left: 16rpx;
+}
+
+.user-list {
+    padding: 0 20rpx;
+}
+
+.user-card {
+    background-color: white;
+    border-radius: 12rpx;
+    padding: 24rpx;
+    margin-bottom: 20rpx;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.user-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20rpx;
+}
+
+.user-name {
+    font-size: 32rpx;
+    font-weight: bold;
+    color: #333;
+}
+
+.user-status {
+    font-size: 24rpx;
+    padding: 4rpx 16rpx;
+    border-radius: 16rpx;
+}
+
+.status-active {
+    background-color: #f6ffed;
+    color: #52c41a;
+}
+
+.status-disabled {
+    background-color: #fff2f0;
+    color: #ff4d4f;
+}
+
+.user-info {
+    padding: 16rpx 0;
+    border-top: 1rpx solid #f0f0f0;
+    border-bottom: 1rpx solid #f0f0f0;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12rpx;
+}
+
+.info-row:last-child {
+    margin-bottom: 0;
+}
+
+.info-label {
+    font-size: 26rpx;
+    color: #999;
+}
+
+.info-value {
+    font-size: 26rpx;
+    color: #333;
+}
+
+.user-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 16rpx;
+}
+
+.action-btn {
+    font-size: 24rpx;
+    color: #1890ff;
+    margin-left: 24rpx;
+}
+
+.text-danger {
+    color: #ff4d4f;
+}
+
+.text-success {
+    color: #52c41a;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 100rpx 0;
+}
+
+.empty-icon {
+    font-size: 80rpx;
+    margin-bottom: 20rpx;
+}
+
+.empty-text {
+    font-size: 28rpx;
+    color: #999;
+}
+
+.loading-more {
+    text-align: center;
+    padding: 20rpx;
+}
+
+.loading-text {
+    font-size: 24rpx;
+    color: #999;
+}

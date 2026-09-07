@@ -1,0 +1,63 @@
+<view class="index-container">
+    <view class="welcome-section">
+        <view class="welcome-text">欢迎回来</view>
+        <view class="user-name">{{userInfo.name || '用户'}}</view>
+    </view>
+
+    <view class="menu-section">
+        <view class="menu-item" bindtap="goToDevice">
+            <view class="menu-icon">📱</view>
+            <view class="menu-content">
+                <view class="menu-title">设备</view>
+                <view class="menu-desc">查看可用设备</view>
+            </view>
+        </view>
+
+        <view class="menu-item" bindtap="goToMyBorrow">
+            <view class="menu-icon">📋</view>
+            <view class="menu-content">
+                <view class="menu-title">我的借用</view>
+                <view class="menu-desc">当前借用设备</view>
+            </view>
+        </view>
+
+        <view class="menu-item" bindtap="goToRecords">
+            <view class="menu-icon">📊</view>
+            <view class="menu-content">
+                <view class="menu-title">借还记录</view>
+                <view class="menu-desc">历史记录</view>
+            </view>
+        </view>
+
+        <view class="menu-item" bindtap="goToPassword">
+            <view class="menu-icon">🔑</view>
+            <view class="menu-content">
+                <view class="menu-title">我的</view>
+                <view class="menu-desc">修改密码</view>
+            </view>
+        </view>
+    </view>
+
+    <view class="admin-section" wx:if="{{isAdmin}}">
+        <view class="section-title">管理功能</view>
+        <view class="admin-menu">
+            <view class="admin-item" bindtap="goToAdminDevice">
+                <view class="admin-icon">⚙️</view>
+                <view class="admin-text">设备管理</view>
+                <view class="admin-desc">分类 / 数量</view>
+            </view>
+
+            <view class="admin-item" bindtap="goToAdminUser">
+                <view class="admin-icon">👥</view>
+                <view class="admin-text">用户管理</view>
+                <view class="admin-desc">用户 / 权限</view>
+            </view>
+
+            <view class="admin-item" bindtap="goToAdminRecord">
+                <view class="admin-icon">📈</view>
+                <view class="admin-text">借还记录</view>
+                <view class="admin-desc">全部记录</view>
+            </view>
+        </view>
+    </view>
+</view>

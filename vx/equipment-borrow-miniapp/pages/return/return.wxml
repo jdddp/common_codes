@@ -1,0 +1,70 @@
+<view class="return-container">
+    <view class="device-info">
+        <view class="info-title">归还设备</view>
+        <view class="info-item">
+            <text class="info-label">设备名称</text>
+            <text class="info-value">{{deviceName}}</text>
+        </view>
+        <view class="info-item">
+            <text class="info-label">借用数量</text>
+            <text class="info-value">{{quantity}}</text>
+        </view>
+        <view class="info-item">
+            <text class="info-label">已归还</text>
+            <text class="info-value">{{returnedQuantity}}</text>
+        </view>
+        <view class="info-item">
+            <text class="info-label">待归还</text>
+            <text class="info-value text-warning">{{outstandingQuantity}}</text>
+        </view>
+    </view>
+
+    <view class="return-form">
+        <view class="input-group">
+            <view class="input-label">归还数量 <text class="required">*</text></view>
+            <input
+                class="input-field"
+                type="number"
+                placeholder="请输入归还数量"
+                value="{{returnQuantity}}"
+                bindinput="onQuantityInput"
+            />
+            <view class="input-hint">最多可归还 {{outstandingQuantity}} 台</view>
+        </view>
+
+        <view class="input-group">
+            <view class="input-label">设备状态</view>
+            <picker
+                range="{{conditionOptions}}"
+                range-key="label"
+                value="{{conditionIndex}}"
+                bindchange="onConditionChange"
+            >
+                <view class="input-field picker-field">
+                    {{conditionOptions[conditionIndex].label}}
+                </view>
+            </picker>
+        </view>
+
+        <view class="input-group">
+            <view class="input-label">备注</view>
+            <textarea
+                class="input-field textarea-field"
+                placeholder="请输入备注（选填）"
+                value="{{remark}}"
+                bindinput="onRemarkInput"
+            />
+        </view>
+    </view>
+
+    <view class="submit-section">
+        <button
+            class="btn-primary submit-btn"
+            bindtap="onSubmit"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+        >
+            确认归还
+        </button>
+    </view>
+</view>

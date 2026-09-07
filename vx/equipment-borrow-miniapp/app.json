@@ -1,0 +1,43 @@
+{
+    "pages": [
+        "pages/login/login",
+        "pages/index/index",
+        "pages/device/device",
+        "pages/borrow/borrow",
+        "pages/my-borrow/my-borrow",
+        "pages/records/records",
+        "pages/password/password",
+        "pages/admin/device/device",
+        "pages/admin/user/user",
+        "pages/admin/record/record"
+    ],
+    "window": {
+        "backgroundTextStyle": "light",
+        "navigationBarBackgroundColor": "#1890ff",
+        "navigationBarTitleText": "设备借还系统",
+        "navigationBarTextStyle": "white"
+    },
+    "tabBar": {
+        "color": "#999",
+        "selectedColor": "#1890ff",
+        "list": [
+            {
+                "pagePath": "pages/index/index",
+                "text": "首页"
+            },
+            {
+                "pagePath": "pages/device/device",
+                "text": "设备"
+            },
+            {
+                "pagePath": "pages/my-borrow/my-borrow",
+                "text": "我的借用"
+            },
+            {
+                "pagePath": "pages/password/password",
+                "text": "我的"
+            }
+        ]
+    },
+    "cloud": true
+}
