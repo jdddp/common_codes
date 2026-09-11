@@ -1,0 +1,34 @@
+{
+  "holdings": [
+    {
+      "code": "000963",
+      "name": "华东医药",
+      "quantity": 700,
+      "cost_price": 27.801,
+      "current_price": 26.26,
+      "sector": null,
+      "notes": null
+    },
+    {
+      "code": "002230",
+      "name": "科大讯飞",
+      "quantity": 200,
+      "cost_price": 39.069,
+      "current_price": 39.14,
+      "sector": null,
+      "notes": null
+    },
+    {
+      "code": "600236",
+      "name": "桂冠电力",
+      "quantity": 300,
+      "cost_price": 9.76,
+      "current_price": 10.07,
+      "sector": null,
+      "notes": null
+    }
+  ],
+  "total_assets": 33746.0,
+  "available_funds": 0.0,
+  "updated_at": "2026-09-11T14:59:32.758545"
+}

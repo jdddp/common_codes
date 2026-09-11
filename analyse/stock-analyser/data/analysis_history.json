@@ -1,0 +1,12 @@
+{
+  "records": [
+    {
+      "stock_code": "000963",
+      "stock_name": "华东医药",
+      "date": "2026-09-11",
+      "trend": "震荡",
+      "confidence": 0.45,
+      "action": "卖出"
+    }
+  ]
+}

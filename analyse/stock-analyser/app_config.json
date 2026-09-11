@@ -1,0 +1,22 @@
+{
+  "host": "127.0.0.1",
+  "port": 8000,
+  "ai": {
+    "provider": "qwen",
+    "api_key": "sk-ws-H.PDYYLXM.WXsq.MEYCIQDZSbntFO9azyBUWX-TFpk5Bx6EOg28FwewexFa75SrvAIhAJYBsObWtgqbM7V_kBLOSXaFJc8kZX_UeuYn_w_ODiwJ",
+    "base_url": "https://llm-aza2t3uz447721ir.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    "model": "qwen3.8-max",
+    "max_tokens": 4096,
+    "temperature": 0.7
+  },
+  "tushare": {
+    "enabled": true,
+    "token": "20bdc7138a5338fe68af07b1069fffecc6962c32939c949e7c8be598",
+    "update_interval": 10,
+    "market_open": "09:30",
+    "market_close": "15:00",
+    "lunch_start": "11:30",
+    "lunch_end": "13:00"
+  },
+  "default_strategy": "pyramid"
+}
