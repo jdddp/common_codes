@@ -10,15 +10,19 @@ DATA_DIR.mkdir(exist_ok=True)
 PORTFOLIO_FILE = DATA_DIR / "portfolio.json"
 ANALYSIS_HISTORY_FILE = DATA_DIR / "analysis_history.json"
 ORDER_HISTORY_FILE = DATA_DIR / "order_history.json"
+MARKET_ANALYSIS_FILE = DATA_DIR / "market_analysis.json"
+CHAT_HISTORY_FILE = DATA_DIR / "chat_history.json"
 
 
 class AIConfig(BaseModel):
-    provider: str = "deepseek"
+    provider: str = "qwen"
     api_key: str = ""
-    base_url: str = "https://api.deepseek.com"
-    model: str = "deepseek-chat"
+    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: str = "qwen3.8-flash"
     max_tokens: int = 4096
     temperature: float = 0.7
+    enable_web_search: bool = True
+    enable_thinking: bool = True
 
 
 class TushareConfig(BaseModel):
@@ -86,3 +90,22 @@ def load_config() -> AppConfig:
 def save_config(config: AppConfig):
     config_file = BASE_DIR / "app_config.json"
     config_file.write_text(config.model_dump_json(indent=2))
+
+
+class MarketAnalysisState(BaseModel):
+    analysis_text: str = ""
+    updated_at: str = ""
+
+
+def load_market_analysis() -> MarketAnalysisState:
+    if MARKET_ANALYSIS_FILE.exists():
+        data = json.loads(MARKET_ANALYSIS_FILE.read_text(encoding="utf-8"))
+        return MarketAnalysisState.model_validate(data)
+    return MarketAnalysisState()
+
+
+def save_market_analysis(state: MarketAnalysisState):
+    MARKET_ANALYSIS_FILE.write_text(
+        json.dumps(state.model_dump(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )

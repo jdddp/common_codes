@@ -14,7 +14,7 @@
       "name": "科大讯飞",
       "quantity": 200,
       "cost_price": 39.069,
-      "current_price": 39.14,
+      "current_price": 39.15,
       "sector": null,
       "notes": null
     },
@@ -28,7 +28,7 @@
       "notes": null
     }
   ],
-  "total_assets": 33746.0,
+  "total_assets": 33748.52,
   "available_funds": 0.0,
-  "updated_at": "2026-09-11T14:59:32.758545"
+  "updated_at": "2026-09-12T19:40:37.172356"
 }

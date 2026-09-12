@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
 
-from config import load_config, save_config, STRATEGIES
+from config import load_config, save_config, STRATEGIES, load_market_analysis, save_market_analysis, MarketAnalysisState
 from models.portfolio import StockHolding, Portfolio
-from services.stock_service import PortfolioService, AnalysisHistoryService, OrderHistoryService
+from services.stock_service import PortfolioService, AnalysisHistoryService, OrderHistoryService, ChatHistoryService
 from services.analysis_service import AnalysisService
 from price_updater import price_updater
 
@@ -29,14 +29,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Stock Analyser", version="1.0.0", lifespan=lifespan)
 
-app = FastAPI(title="Stock Analyser", version="1.0.0")
-
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 portfolio_svc = PortfolioService()
 history_svc = AnalysisHistoryService()
 order_svc = OrderHistoryService()
+chat_history_svc = ChatHistoryService()
 analysis_svc = AnalysisService()
 
 
@@ -87,12 +86,18 @@ class ConfigRequest(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
+    enable_web_search: Optional[bool] = None
+    enable_thinking: Optional[bool] = None
 
 
 class TushareConfigRequest(BaseModel):
     enabled: Optional[bool] = None
     token: Optional[str] = None
     update_interval: Optional[int] = None
+
+
+class MarketAnalysisRequest(BaseModel):
+    market_analysis: str
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -156,10 +161,30 @@ async def import_holdings(holdings: List[AddHoldingRequest]):
     return {"message": f"已导入 {len(items)} 条持仓", "total": len(p.holdings)}
 
 
+@app.get("/market-analysis")
+async def get_market_analysis():
+    state = load_market_analysis()
+    return {
+        "market_analysis": state.analysis_text,
+        "updated_at": state.updated_at,
+    }
+
+
+@app.post("/market-analysis")
+async def save_market_analysis_state(req: MarketAnalysisRequest):
+    from datetime import datetime
+    state = MarketAnalysisState(
+        analysis_text=req.market_analysis,
+        updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
+    save_market_analysis(state)
+    return {"message": "大盘分析已保存", "updated_at": state.updated_at}
+
+
 @app.post("/analysis")
 async def analyze(req: AnalysisRequest):
     try:
-        result = analysis_svc.analyze_stock(req.stock_code, req.market_analysis)
+        result = await analysis_svc.analyze_stock(req.stock_code, req.market_analysis)
         return result.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -170,7 +195,7 @@ async def analyze(req: AnalysisRequest):
 @app.post("/analysis/batch")
 async def analyze_batch(req: BatchAnalysisRequest):
     try:
-        results = analysis_svc.analyze_all(req.market_analysis, req.stock_codes)
+        results = await analysis_svc.analyze_all(req.market_analysis, req.stock_codes)
         return {"results": [r.model_dump() for r in results]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"批量分析失败: {str(e)}")
@@ -179,15 +204,33 @@ async def analyze_batch(req: BatchAnalysisRequest):
 @app.post("/chat")
 async def chat(req: ChatRequest):
     try:
-        reply = analysis_svc.chat(req.message, req.stock_code or "")
+        reply = await analysis_svc.chat(req.message, req.stock_code or "")
         return {"reply": reply}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/chat/history")
+async def get_chat_history():
+    records = chat_history_svc.load()
+    return {"records": records}
+
+
+@app.delete("/chat/history")
+async def clear_chat_history():
+    chat_history_svc.clear()
+    return {"message": "聊天历史已清除"}
+
+
 @app.get("/history/{stock_code}")
 async def get_history(stock_code: str):
     records = history_svc.get_by_stock(stock_code)
+    return {"records": records}
+
+
+@app.get("/history/recent/{limit}")
+async def get_recent_history(limit: int = 20):
+    records = history_svc.get_recent(limit)
     return {"records": records}
 
 
@@ -204,6 +247,8 @@ async def get_config():
         "base_url": cfg.ai.base_url,
         "model": cfg.ai.model,
         "has_api_key": bool(cfg.ai.api_key),
+        "enable_web_search": cfg.ai.enable_web_search,
+        "enable_thinking": cfg.ai.enable_thinking,
     }
 
 
@@ -218,6 +263,10 @@ async def update_config(req: ConfigRequest):
         cfg.ai.base_url = req.base_url
     if req.model:
         cfg.ai.model = req.model
+    if req.enable_web_search is not None:
+        cfg.ai.enable_web_search = req.enable_web_search
+    if req.enable_thinking is not None:
+        cfg.ai.enable_thinking = req.enable_thinking
     save_config(cfg)
     return {"message": "配置已更新"}
 

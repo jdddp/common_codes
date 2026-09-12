@@ -75,17 +75,27 @@
         .chat-box { display: flex; gap: 8px; margin-top: 12px; }
         .chat-box input { flex: 1; }
         
-        .chat-messages { max-height: 500px; overflow-y: auto; margin-bottom: 12px; padding: 8px; background: #111; border-radius: 8px; }
-        .chat-msg { padding: 12px 16px; margin-bottom: 10px; border-radius: 12px; font-size: 14px; line-height: 1.7; }
-        .chat-msg.user { background: linear-gradient(135deg, #1a237e, #283593); margin-left: 50px; text-align: right; }
-        .chat-msg.ai { background: linear-gradient(135deg, #1b5e20, #2e7d32); margin-right: 50px; }
-        .chat-msg.ai p { margin: 8px 0; }
-        .chat-msg.ai ul, .chat-msg.ai ol { margin: 8px 0; padding-left: 20px; }
-        .chat-msg.ai li { margin: 4px 0; }
-        .chat-msg.ai strong { color: #81c784; }
-        .chat-msg.ai h3, .chat-msg.ai h4 { color: #a5d6a7; margin: 12px 0 6px; }
-        .chat-msg.ai code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
-        .chat-msg.user .label { font-size: 11px; color: #90caf9; margin-bottom: 4px; }
+        .chat-messages { max-height: 70vh; overflow-y: auto; margin-bottom: 12px; }
+        .chat-msg { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #222; }
+        .chat-msg:last-child { border-bottom: none; }
+        
+        .chat-msg .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .chat-msg .msg-header .tag { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+        .chat-msg.user .msg-header .tag { background: #1565c0; color: #fff; }
+        .chat-msg.ai .msg-header .tag { background: #2e7d32; color: #fff; }
+        .chat-msg .msg-header .time { font-size: 12px; color: #555; }
+        
+        .chat-msg .msg-content { font-size: 14px; line-height: 1.8; color: #e0e0e0; }
+        .chat-msg.user .msg-content { color: #90caf9; }
+        
+        .chat-msg.ai .msg-content p { margin: 10px 0; }
+        .chat-msg.ai .msg-content p:first-child { margin-top: 0; }
+        .chat-msg.ai .msg-content ul, .chat-msg.ai .msg-content ol { margin: 10px 0; padding-left: 24px; }
+        .chat-msg.ai .msg-content li { margin: 6px 0; }
+        .chat-msg.ai .msg-content strong { color: #81c784; }
+        .chat-msg.ai .msg-content h3, .chat-msg.ai .msg-content h4 { color: #a5d6a7; margin: 16px 0 8px; }
+        .chat-msg.ai .msg-content code { background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 4px; }
+        .chat-msg.ai .msg-content blockquote { border-left: 3px solid #4caf50; padding-left: 12px; margin: 10px 0; color: #aaa; }
         
         .loading { text-align: center; padding: 20px; color: #888; }
         .empty { text-align: center; padding: 40px; color: #666; }
@@ -157,10 +167,16 @@
 <div id="tab-analysis" class="panel">
     <div class="card">
         <h3>大盘分析输入</h3>
+        <div id="market-analysis-status" style="font-size:12px;color:#888;margin-bottom:8px"></div>
         <div class="form-group">
             <label>输入今日大盘整体分析（指数、板块、资金流向、政策面等）</label>
             <textarea id="a-market" rows="6" placeholder="请输入今日大盘整体分析，例如：&#10;&#10;今日大盘低开高走，上证指数收涨0.5%至3200点。&#10;成交量放大至1万亿，北向资金净流入30亿。&#10;板块方面，新能源、半导体领涨，地产、银行回调。&#10;政策面：央行降准0.25%，利好金融板块。&#10;技术面：指数站上5日线，短期偏多。"></textarea>
         </div>
+        <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-success" onclick="saveMarketAnalysis()">保存大盘分析</button>
+            <span id="market-save-status" style="font-size:12px;color:#66bb6a"></span>
+        </div>
+        <div style="font-size:11px;color:#666;margin-top:8px">保存后，AI分析和对话将自动引用此分析进行验证和对比</div>
     </div>
     
     <div class="card">
@@ -178,21 +194,32 @@
     </div>
     
     <div id="analysis-result" class="analysis-result"></div>
+    
+    <div class="card" style="margin-top:16px">
+        <h3 style="display:flex;justify-content:space-between;align-items:center">
+            <span>历史分析记录</span>
+            <button class="btn btn-secondary" onclick="loadHistory()" style="font-size:12px;padding:6px 12px">刷新</button>
+        </h3>
+        <div id="history-records"></div>
+    </div>
 </div>
 
 <div id="tab-chat" class="panel">
-    <div class="card">
-        <h3 style="display:flex;justify-content:space-between;align-items:center">
-            <span>AI对话助手</span>
+    <div class="card" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="margin:0;color:#4fc3f7">AI对话助手</h3>
             <button class="btn btn-secondary" onclick="clearChatHistory()" style="font-size:12px;padding:6px 12px">清除历史</button>
-        </h3>
-        <div class="form-row">
-            <div class="form-group"><label>关联股票(可选)</label><select id="c-stock"><option value="">无</option></select></div>
+        </div>
+        <div style="margin-bottom:12px">
+            <label style="font-size:12px;color:#888;display:block;margin-bottom:4px">关联股票(可选)</label>
+            <select id="c-stock" style="width:200px;padding:8px;background:#111;border:1px solid #444;border-radius:6px;color:#fff;font-size:13px">
+                <option value="">无</option>
+            </select>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
-        <div class="chat-box">
-            <input id="chat-input" placeholder="输入问题，如：茅台现在能买吗？" onkeydown="if(event.key==='Enter')sendChat()">
-            <button class="btn btn-primary" onclick="sendChat()">发送</button>
+        <div class="chat-box" style="margin-top:12px">
+            <input id="chat-input" placeholder="输入问题，如：茅台现在能买吗？" onkeydown="if(event.key==='Enter')sendChat()" style="padding:12px 16px;background:#111;border:1px solid #444;border-radius:20px;color:#fff;font-size:14px">
+            <button class="btn btn-primary" onclick="sendChat()" style="border-radius:20px;padding:12px 24px">发送</button>
         </div>
     </div>
 </div>
@@ -214,6 +241,22 @@
         </div>
         <div class="form-row">
             <div class="form-group"><label>Base URL</label><input id="cfg-url" placeholder="https://api.deepseek.com"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group" style="max-width:200px">
+                <label>联网搜索</label>
+                <select id="cfg-web-search">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </div>
+            <div class="form-group" style="max-width:200px">
+                <label>思考模式</label>
+                <select id="cfg-thinking">
+                    <option value="true">开启（深度分析）</option>
+                    <option value="false">关闭（快速响应）</option>
+                </select>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
         <span id="config-status" style="margin-left:12px;font-size:12px;color:#66bb6a"></span>
@@ -266,7 +309,11 @@ function switchTab(name) {
     document.getElementById('tab-' + name).classList.add('active');
     event.target.classList.add('active');
     if (name === 'portfolio') loadPortfolio();
-    if (name === 'analysis') loadStockSelect();
+    if (name === 'analysis') {
+        loadStockSelect();
+        loadHistory();
+        loadMarketAnalysis();
+    }
 }
 
 async function api(method, path, body) {
@@ -313,6 +360,13 @@ async function loadPortfolio() {
 }
 
 function fmt(v) { return (v || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+function showMsg(msg) {
+    const el = document.getElementById('analysis-result');
+    if (!el) { alert(msg); return; }
+    el.innerHTML = `<div class="result-section"><h4>提示</h4><p>${msg}</p></div>`;
+    el.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
 
 async function addHolding() {
     const code = document.getElementById('h-code').value.trim();
@@ -381,7 +435,7 @@ async function runAnalysis() {
     if (!code) return alert('请选择股票');
     if (!market) return alert('请输入大盘分析');
     
-    document.getElementById('analysis-result').innerHTML = '<div class="loading">AI分析中，请稍候...</div>';
+    document.getElementById('analysis-result').innerHTML = '<div class="loading">联网分析中，通常需要1-3分钟，请耐心等待...</div>';
     
     try {
         const data = await api('POST', '/analysis', { stock_code: code, market_analysis: market });
@@ -394,20 +448,21 @@ async function runAnalysis() {
 
 async function runBatchAnalysis() {
     const market = document.getElementById('a-market').value.trim();
-    if (!market) return alert('请输入大盘分析');
-    if (!portfolioData?.holdings?.length) return alert('暂无持仓，请先添加');
-    
-    const count = portfolioData.holdings.length;
-    if (!confirm(`将分析全部 ${count} 只持仓股票，预计需要 ${count * 5}-${count * 10} 秒，确认继续？`)) return;
-    
-    document.getElementById('analysis-result').innerHTML = `<div class="loading">正在批量分析 ${count} 只股票，请稍候...</div>`;
+    if (!market) return showMsg('请输入大盘分析');
+
+    const data = await api('GET', '/portfolio');
+    const holdings = data?.holdings || [];
+    if (!holdings.length) return showMsg('暂无持仓，请先添加');
+
+    document.getElementById('analysis-result').innerHTML = `<div class="loading">联网批量分析中，通常需要1-3分钟，请耐心等待...</div>`;
     
     try {
-        const data = await api('POST', '/analysis/batch', { market_analysis: market });
-        if (data.detail) throw new Error(data.detail);
+        const result = await api('POST', '/analysis/batch', { market_analysis: market });
+        if (result.detail) throw new Error(result.detail);
         
-        let html = `<div class="result-section"><h4>批量分析完成 - 共 ${data.results.length} 只股票</h4></div>`;
-        for (const r of data.results) {
+        const results = result.results || [];
+        let html = `<div class="result-section"><h4>批量分析完成 - 共 ${results.length} 只股票</h4></div>`;
+        for (const r of results) {
             html += renderAnalysisItem(r);
         }
         document.getElementById('analysis-result').innerHTML = html;
@@ -426,7 +481,7 @@ function renderAnalysisItem(d) {
         <span class="badge ${actionClass(d.operation_suggestion?.action || '')}">${d.operation_suggestion?.action || ''}</span>
     </h3>`;
     
-    html += `<p style="font-size:13px;color:#888;margin:8px 0">当前价: ${d.current_price} | 成本: ${d.analysis_date || '-'}</p>`;
+    html += `<p style="font-size:13px;color:#888;margin:8px 0">当前价: ${d.current_price} | 成本: ${d.cost_price || '-'}</p>`;
     
     html += `<div class="result-section" style="margin:8px 0;padding:12px">
         <p><strong>走势:</strong> <span class="${trendClass(d.prediction?.next_day_trend)}">${d.prediction?.next_day_trend}</span>
@@ -452,6 +507,12 @@ function renderAnalysisItem(d) {
         if (op.stop_loss) html += `<p style="font-size:12px;margin-top:8px">止损: ${op.stop_loss.price}元 - ${op.stop_loss.action}</p>`;
         if (op.take_profit) html += `<p style="font-size:12px">止盈: ${op.take_profit.price}元 - ${op.take_profit.action}</p>`;
         html += '</details>';
+    }
+    
+    if (d.follow_up) {
+        html += `<div style="font-size:12px;color:#4fc3f7;margin-top:8px;padding:8px;background:#111;border-radius:4px">
+            <strong>后续关注:</strong> ${d.follow_up}
+        </div>`;
     }
     
     if (d.risk_warning && d.risk_warning.length > 0) {
@@ -521,67 +582,207 @@ async function sendChat() {
     input.value = '';
     
     const box = document.getElementById('chat-messages');
-    box.innerHTML += `<div class="chat-msg user"><div class="label">你</div>${esc(msg)}</div>`;
-    box.innerHTML += `<div class="chat-msg ai" id="chat-loading"><div class="label">AI分析师</div>思考中...</div>`;
+    const now = new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
+    box.innerHTML += `
+        <div class="chat-msg user">
+            <div class="msg-header">
+                <span class="tag">你</span>
+                <span class="time">${now}</span>
+            </div>
+            <div class="msg-content">${esc(msg)}</div>
+        </div>`;
+    box.innerHTML += `
+        <div class="chat-msg ai" id="chat-loading">
+            <div class="msg-header">
+                <span class="tag">AI分析师</span>
+            </div>
+            <div class="msg-content"><span style="color:#888">思考中...</span></div>
+        </div>`;
     box.scrollTop = box.scrollHeight;
     
     const stockCode = document.getElementById('c-stock').value;
     try {
         const data = await api('POST', '/chat', { message: msg, stock_code: stockCode || null });
         const reply = data.reply || data.detail || '无回复';
-        document.getElementById('chat-loading').innerHTML = `<div class="label">AI分析师</div>` + renderMarkdown(reply);
+        document.getElementById('chat-loading').querySelector('.msg-content').innerHTML = renderMarkdown(reply);
         document.getElementById('chat-loading').removeAttribute('id');
         saveChatHistory(msg, reply, stockCode);
     } catch(e) {
-        document.getElementById('chat-loading').innerHTML = `<div class="label">AI分析师</div>请求失败: ` + e.message;
+        document.getElementById('chat-loading').querySelector('.msg-content').innerHTML = `<span style="color:#ef5350">请求失败: ${e.message}</span>`;
         document.getElementById('chat-loading').removeAttribute('id');
     }
     box.scrollTop = box.scrollHeight;
 }
 
 function renderMarkdown(text) {
-    let html = esc(text);
-    html = html.replace(/^### (.*$)/gm, '<h4>$1</h4>');
+    let html = text;
+    
+    html = html.replace(/^# (.*$)/gm, '<h2>$1</h2>');
     html = html.replace(/^## (.*$)/gm, '<h3>$1</h3>');
+    html = html.replace(/^### (.*$)/gm, '<h4>$1</h4>');
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/`(.*?)`/g, '<code>$1</code>');
     html = html.replace(/^- (.*$)/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    
+    const tags = [];
+    html = html.replace(/<[^>]+>/g, match => {
+        tags.push(match);
+        return `\x00${tags.length - 1}\x00`;
+    });
+    
+    html = esc(html);
+    
+    html = html.replace(/\x00(\d+)\x00/g, (m, i) => tags[parseInt(i)]);
+    html = html.replace(/(<li>[\s\S]*<\/li>)/g, '<ul>$1</ul>');
     html = html.replace(/\n\n/g, '</p><p>');
-    html = html.replace(/\n/g, '<br>');
     html = '<p>' + html + '</p>';
     return html;
 }
 
 function saveChatHistory(msg, reply, stockCode) {
-    let history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-    history.push({ msg, reply, stockCode, time: new Date().toLocaleString() });
-    if (history.length > 10) history = history.slice(-10);
-    localStorage.setItem('chat_history', JSON.stringify(history));
+    // 历史记录已由后端自动保存，无需前端存储
 }
 
 function loadChatHistory() {
-    const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-    const box = document.getElementById('chat-messages');
-    for (const item of history) {
-        box.innerHTML += `<div class="chat-msg user"><div class="label">你 (${item.time})</div>${esc(item.msg)}</div>`;
-        box.innerHTML += `<div class="chat-msg ai"><div class="label">AI分析师</div>` + renderMarkdown(item.reply) + `</div>`;
-    }
-    box.scrollTop = box.scrollHeight;
+    api('GET', '/chat/history').then(data => {
+        const history = data.records || [];
+        const box = document.getElementById('chat-messages');
+        for (const item of history) {
+            box.innerHTML += `
+                <div class="chat-msg user">
+                    <div class="msg-header">
+                        <span class="tag">你</span>
+                        <span class="time">${esc(item.time)}</span>
+                    </div>
+                    <div class="msg-content">${esc(item.msg)}</div>
+                </div>`;
+            box.innerHTML += `
+                <div class="chat-msg ai">
+                    <div class="msg-header">
+                        <span class="tag">AI分析师</span>
+                    </div>
+                    <div class="msg-content">${renderMarkdown(item.reply)}</div>
+                </div>`;
+        }
+        box.scrollTop = box.scrollHeight;
+    }).catch(e => console.error('加载聊天历史失败:', e));
 }
 
 function clearChatHistory() {
-    localStorage.removeItem('chat_history');
-    document.getElementById('chat-messages').innerHTML = '';
+    api('DELETE', '/chat/history').then(() => {
+        document.getElementById('chat-messages').innerHTML = '';
+    }).catch(e => {
+        document.getElementById('chat-messages').innerHTML = '';
+        console.error('清除聊天历史失败:', e);
+    });
 }
 
 function esc(s) { return s.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'); }
+
+async function loadHistory() {
+    try {
+        const data = await api('GET', '/history/recent/20');
+        const records = data.records || [];
+        const el = document.getElementById('history-records');
+        
+        if (records.length === 0) {
+            el.innerHTML = '<div class="empty">暂无历史分析记录</div>';
+            return;
+        }
+        
+        let html = '';
+        for (const r of records) {
+            const trendClass = (r.prediction?.next_day_trend || '').includes('涨') ? 'trend-up' : 
+                             (r.prediction?.next_day_trend || '').includes('跌') ? 'trend-down' : 'trend-flat';
+            const actionClass = (r.operation_suggestion?.action || '').includes('买') ? 'badge-buy' : 
+                              (r.operation_suggestion?.action || '').includes('卖') ? 'badge-sell' : '';
+            
+            html += `<div class="card" style="border-left:3px solid ${(r.prediction?.next_day_trend||'').includes('涨') ? '#ef5350' : (r.prediction?.next_day_trend||'').includes('跌') ? '#66bb6a' : '#ffa726'}; margin-bottom:12px; padding:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span><strong>${r.stock_code} ${r.stock_name}</strong></span>
+                    <span class="badge ${actionClass}">${r.operation_suggestion?.action || ''}</span>
+                </div>
+                <div style="font-size:12px;color:#888;margin:6px 0">分析时间: ${r.date}</div>
+                <div style="font-size:13px;margin:4px 0">
+                    当前价: ${r.current_price || '-'} | 成本: ${r.cost_price || '-'}
+                </div>
+                <div style="font-size:13px;margin:4px 0">
+                    <span class="${trendClass}">走势: ${r.prediction?.next_day_trend || ''}</span>
+                    | 信心度: ${((r.prediction?.confidence || 0) * 100).toFixed(0)}%
+                    | 目标: ${r.prediction?.target_price || '-'} | 止损: ${r.prediction?.stop_loss || '-'}
+                </div>
+                <div style="font-size:12px;color:#888;margin:4px 0">理由: ${r.operation_suggestion?.reason || ''}</div>
+                
+                ${r.market_analysis_input ? `<div style="font-size:12px;color:#888;margin:8px 0;padding:8px;background:#111;border-radius:4px">
+                    <strong>当时大盘分析:</strong> ${r.market_analysis_input.substring(0, 100)}${r.market_analysis_input.length > 100 ? '...' : ''}
+                </div>` : ''}
+                
+                ${r.order_plan?.orders?.length > 0 ? `
+                <details style="margin-top:8px">
+                    <summary style="cursor:pointer;color:#4fc3f7;font-size:12px">挂单计划 - ${r.order_plan.strategy}</summary>
+                    <table class="order-table" style="margin-top:8px">
+                        <tr><th>笔</th><th>方向</th><th>价格</th><th>数量</th><th>条件</th></tr>
+                        ${r.order_plan.orders.map(o => `
+                        <tr>
+                            <td>${o.batch}</td>
+                            <td><span class="badge ${o.side === 'buy' ? 'badge-buy' : 'badge-sell'}">${o.side === 'buy' ? '买入' : '卖出'}</span></td>
+                            <td>${o.price}</td><td>${o.quantity}股</td><td style="font-size:11px">${o.condition}</td>
+                        </tr>`).join('')}
+                    </table>
+                    ${r.order_plan.stop_loss ? `<p style="font-size:11px;margin-top:6px">止损: ${r.order_plan.stop_loss.price}元 - ${r.order_plan.stop_loss.action}</p>` : ''}
+                    ${r.order_plan.take_profit ? `<p style="font-size:11px">止盈: ${r.order_plan.take_profit.price}元 - ${r.order_plan.take_profit.action}</p>` : ''}
+                </details>` : ''}
+                
+                ${r.follow_up ? `<div style="font-size:11px;color:#4fc3f7;margin-top:6px;padding:6px;background:#111;border-radius:4px">
+                    <strong>后续关注:</strong> ${r.follow_up}
+                </div>` : ''}
+                
+                ${r.risk_warning?.length > 0 ? `<div style="font-size:11px;color:#ffa726;margin-top:6px">⚠️ ${r.risk_warning.join(' | ')}</div>` : ''}
+            </div>`;
+        }
+        
+        el.innerHTML = html;
+    } catch(e) {
+        document.getElementById('history-records').innerHTML = `<div class="empty">加载历史失败: ${e.message}</div>`;
+    }
+}
+
+async function loadMarketAnalysis() {
+    try {
+        const data = await api('GET', '/market-analysis');
+        const el = document.getElementById('market-analysis-status');
+        if (data.market_analysis) {
+            el.innerHTML = `<span style="color:#66bb6a">● 已保存</span> | 更新时间: ${data.updated_at}`;
+            document.getElementById('a-market').value = data.market_analysis;
+        } else {
+            el.innerHTML = '<span style="color:#888">○ 未保存</span> | 请保存大盘分析后，AI分析和对话将自动引用';
+        }
+    } catch(e) {
+        console.error('加载大盘分析失败:', e);
+    }
+}
+
+async function saveMarketAnalysis() {
+    const market = document.getElementById('a-market').value.trim();
+    if (!market) return showMsg('请输入大盘分析内容');
+    
+    try {
+        const data = await api('POST', '/market-analysis', { market_analysis: market });
+        document.getElementById('market-save-status').textContent = '已保存';
+        setTimeout(() => document.getElementById('market-save-status').textContent = '', 2000);
+        loadMarketAnalysis();
+    } catch(e) {
+        document.getElementById('market-save-status').textContent = '保存失败: ' + e.message;
+    }
+}
 
 async function loadConfig() {
     const data = await api('GET', '/config');
     document.getElementById('cfg-provider').value = data.provider || 'deepseek';
     document.getElementById('cfg-model').value = data.model || '';
     document.getElementById('cfg-url').value = data.base_url || '';
+    document.getElementById('cfg-web-search').value = data.enable_web_search ? 'true' : 'false';
+    document.getElementById('cfg-thinking').value = data.enable_thinking ? 'true' : 'false';
     
     const tsData = await api('GET', '/config/tushare');
     document.getElementById('ts-enabled').value = tsData.enabled ? 'true' : 'false';
@@ -595,12 +796,16 @@ async function saveConfig() {
     const model = document.getElementById('cfg-model').value;
     const apiKey = document.getElementById('cfg-key').value;
     const baseUrl = document.getElementById('cfg-url').value;
+    const enableWebSearch = document.getElementById('cfg-web-search').value === 'true';
+    const enableThinking = document.getElementById('cfg-thinking').value === 'true';
     
     const body = {};
     if (provider) body.provider = provider;
     if (model) body.model = model;
     if (apiKey) body.api_key = apiKey;
     if (baseUrl) body.base_url = baseUrl;
+    body.enable_web_search = enableWebSearch;
+    body.enable_thinking = enableThinking;
     
     await api('POST', '/config', body);
     document.getElementById('config-status').textContent = '已保存';
@@ -659,6 +864,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     loadChatHistory();
     loadStockSelect();
+    loadHistory();
+    loadMarketAnalysis();
     setInterval(loadPriceStatus, 30000);
     setInterval(() => {
         if (document.getElementById('tab-portfolio').classList.contains('active')) {

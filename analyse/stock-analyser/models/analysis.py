@@ -6,7 +6,7 @@ from datetime import date
 class OrderBatch(BaseModel):
     batch: int
     price: float
-    percentage: int
+    percentage: float
     quantity: int
     condition: str
     side: str = "buy"
@@ -19,7 +19,7 @@ class StopLossTakeProfit(BaseModel):
 
 class OrderPlan(BaseModel):
     strategy: str
-    total_position_pct: int
+    total_position_pct: float
     orders: List[OrderBatch]
     stop_loss: Optional[StopLossTakeProfit] = None
     take_profit: Optional[StopLossTakeProfit] = None
@@ -48,10 +48,12 @@ class AnalysisResult(BaseModel):
     stock_code: str
     stock_name: str
     current_price: float
+    cost_price: float = 0.0
     analysis_date: str
     market_analysis: MarketAnalysis
     prediction: Prediction
     operation_suggestion: OperationSuggestion
     order_plan: OrderPlan
+    follow_up: str = ""
     risk_warning: List[str] = []
     raw_response: Optional[str] = None

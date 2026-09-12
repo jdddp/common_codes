@@ -14,7 +14,7 @@ def parse_analysis_response(
     stock_code: str,
     stock_name: str,
     current_price: float,
-    cost_price: int = 0,
+    cost_price: float = 0.0,
     quantity: int = 0,
 ) -> AnalysisResult:
     if "error" in data:
@@ -22,6 +22,7 @@ def parse_analysis_response(
             stock_code=stock_code,
             stock_name=stock_name,
             current_price=current_price,
+            cost_price=cost_price,
             analysis_date="",
             market_analysis=MarketAnalysis(trend="未知", summary=data.get("raw_response", "")),
             prediction=Prediction(
@@ -66,6 +67,7 @@ def parse_analysis_response(
         stock_code=stock_code,
         stock_name=stock_name,
         current_price=current_price,
+        cost_price=cost_price,
         analysis_date="",
         market_analysis=MarketAnalysis(
             trend=ma_data.get("trend", ""),
@@ -90,6 +92,7 @@ def parse_analysis_response(
             stop_loss=stop_loss,
             take_profit=take_profit,
         ),
+        follow_up=data.get("follow_up", ""),
         risk_warning=data.get("risk_warning", []),
         raw_response=data.get("raw_response"),
     )

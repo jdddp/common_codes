@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import List
 from models.portfolio import Portfolio, StockHolding
-from config import PORTFOLIO_FILE, ANALYSIS_HISTORY_FILE, ORDER_HISTORY_FILE
+from config import PORTFOLIO_FILE, ANALYSIS_HISTORY_FILE, ORDER_HISTORY_FILE, CHAT_HISTORY_FILE
 
 
 def _load_json(path) -> dict:
@@ -85,6 +85,9 @@ class PortfolioService:
 
 
 class AnalysisHistoryService:
+    def __init__(self):
+        self.max_per_stock = 3
+
     def load(self) -> List[dict]:
         data = _load_json(ANALYSIS_HISTORY_FILE)
         return data.get("records", [])
@@ -92,13 +95,30 @@ class AnalysisHistoryService:
     def save_record(self, record: dict):
         data = _load_json(ANALYSIS_HISTORY_FILE)
         records = data.get("records", [])
+
+        stock_code = record.get("stock_code")
+        if stock_code:
+            records = [r for r in records if r.get("stock_code") != stock_code]
+
         records.insert(0, record)
-        data["records"] = records[:100]
+
+        code_counts = {}
+        filtered = []
+        for r in records:
+            code = r.get("stock_code")
+            code_counts[code] = code_counts.get(code, 0) + 1
+            if code_counts[code] <= self.max_per_stock:
+                filtered.append(r)
+
+        data["records"] = filtered
         _save_json(ANALYSIS_HISTORY_FILE, data)
 
     def get_by_stock(self, code: str, limit: int = 10) -> List[dict]:
         records = self.load()
         return [r for r in records if r.get("stock_code") == code][:limit]
+
+    def get_recent(self, limit: int = 20) -> List[dict]:
+        return self.load()[:limit]
 
 
 class OrderHistoryService:
@@ -112,3 +132,22 @@ class OrderHistoryService:
         records.insert(0, record)
         data["records"] = records[:100]
         _save_json(ORDER_HISTORY_FILE, data)
+
+
+class ChatHistoryService:
+    def __init__(self):
+        self.max_records = 10
+
+    def load(self) -> List[dict]:
+        data = _load_json(CHAT_HISTORY_FILE)
+        return data.get("records", [])[:self.max_records]
+
+    def save_record(self, record: dict):
+        data = _load_json(CHAT_HISTORY_FILE)
+        records = data.get("records", [])
+        records.insert(0, record)
+        data["records"] = records[:self.max_records]
+        _save_json(CHAT_HISTORY_FILE, data)
+
+    def clear(self):
+        _save_json(CHAT_HISTORY_FILE, {"records": []})
