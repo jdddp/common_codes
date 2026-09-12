@@ -3,85 +3,74 @@ const util = require('../../utils/util');
 
 Page({
     data: {
-        categories: [],
-        devices: [],
-        currentCategory: '',
+        tree: [],
+        filteredTree: [],
         keyword: '',
-        loading: false,
-        page: 1,
-        pageSize: 20,
-        hasMore: true
+        loading: false
     },
 
     onLoad() {
-        this.loadCategories();
-        this.loadDevices();
+        this.loadData();
     },
 
-    onPullDownRefresh() {
-        this.setData({
-            page: 1,
-            hasMore: true,
-            devices: []
-        });
-        this.loadDevices();
-        wx.stopPullDownRefresh();
+    onShow() {
+        this.loadData();
     },
 
-    onReachBottom() {
-        if (this.data.hasMore && !this.data.loading) {
-            this.loadMore();
-        }
-    },
-
-    async loadCategories() {
-        try {
-            const result = await util.callCloudFunction('device', {
-                action: 'listCategories'
-            });
-
-            if (result.code === 0) {
-                this.setData({ categories: result.data });
-            }
-        } catch (error) {
-            console.error('加载分类失败:', error);
-        }
-    },
-
-    async loadDevices() {
-        if (this.data.loading) return;
-
+    async loadData() {
         this.setData({ loading: true });
-
         try {
-            const result = await util.callCloudFunction('device', {
-                action: 'listDevices',
-                categoryId: this.data.currentCategory,
-                page: this.data.page,
-                pageSize: this.data.pageSize
-            });
-
-            if (result.code === 0) {
-                const devices = this.data.page === 1
-                    ? result.data.list
-                    : [...this.data.devices, ...result.data.list];
-
-                this.setData({
-                    devices,
-                    hasMore: result.data.list.length === this.data.pageSize
-                });
+            const [catRes, devRes] = await Promise.all([
+                util.callCloudFunction('device', { action: 'listAllCategories' }),
+                util.callCloudFunction('device', { action: 'listDevices', status: 'active' })
+            ]);
+            if (catRes.code === 0 && devRes.code === 0) {
+                const tree = this.buildTree(catRes.data, devRes.data.list);
+                this.setData({ tree, filteredTree: tree });
             }
         } catch (error) {
-            console.error('加载设备失败:', error);
-            util.showError('加载设备失败');
+            util.showError('加载失败');
         } finally {
             this.setData({ loading: false });
         }
     },
 
-    loadMore() {
-        this.setData({ page: this.data.page + 1 });
-        this.loadDevices();
+    buildTree(categories, devices) {
+        const catMap = {};
+        const roots = [];
+        const deviceList = [];
+
+        categories.forEach(c => {
+            catMap[c._id] = { ...c, children: [], devices: [], expanded: false };
+        });
+
+        categories.forEach(c => {
+            if (c.parentId && catMap[c.parentId]) {
+                catMap[c.parentId].children.push(catMap[c._id]);
+            } else {
+                roots.push(catMap[c._id]);
+            }
+        });
+
+        devices.forEach(d => {
+            if (catMap[d.categoryId]) {
+                catMap[d.categoryId].devices.push(d);
+                d.fullPath = this.getFullPath(catMap, d.categoryId);
+            }
+            deviceList.push(d);
+        });
+
+        return roots;
+    },
+
+    getFullPath(catMap, categoryId) {
+        const parts = [];
+        let current = catMap[categoryId];
+        while (current) {
+            parts.unshift(current.name);
+            current = current.parentId ? catMap[current.parentId] : null;
+        }
+        return parts.join(' > ');
     },
 
     onSearchInput(e) {
@@ -89,32 +78,63 @@ Page({
     },
 
     onSearch() {
-        this.setData({ page: 1, hasMore: true, devices: [] });
-        this.loadDevices();
-    },
-
-    onCategoryTap(e) {
-        const categoryId = e.currentTarget.dataset.id;
-        this.setData({
-            currentCategory: categoryId,
-            page: 1,
-            hasMore: true,
-            devices: []
-        });
-        this.loadDevices();
-    },
-
-    onDeviceTap(e) {
-        const device = e.currentTarget.dataset.device;
-        if (device.status === 'active' && device.availableQuantity > 0) {
-            this.onBorrowTap(e);
+        const { keyword, tree } = this.data;
+        if (!keyword.trim()) {
+            this.setData({ filteredTree: tree });
+            return;
         }
+
+        const filtered = this.filterTree(tree, keyword.toLowerCase());
+        this.setData({ filteredTree: filtered });
     },
 
-    onBorrowTap(e) {
+    filterTree(nodes, keyword) {
+        return nodes.map(node => {
+            const matchedDevices = node.devices.filter(d =>
+                d.name.toLowerCase().includes(keyword) ||
+                (d.fullPath && d.fullPath.toLowerCase().includes(keyword))
+            );
+
+            const filteredChildren = this.filterTree(node.children || [], keyword);
+
+            const nameMatch = node.name.toLowerCase().includes(keyword);
+            const hasMatchedDevices = matchedDevices.length > 0;
+            const hasMatchedChildren = filteredChildren.length > 0;
+
+            if (nameMatch || hasMatchedDevices || hasMatchedChildren) {
+                return {
+                    ...node,
+                    devices: matchedDevices,
+                    children: filteredChildren,
+                    expanded: true
+                };
+            }
+            return null;
+        }).filter(Boolean);
+    },
+
+    onToggleNode(e) {
+        const id = e.currentTarget.dataset.id;
+        this.toggleNode(this.data.filteredTree, id);
+        this.setData({ filteredTree: this.data.filteredTree });
+    },
+
+    toggleNode(nodes, id) {
+        for (let node of nodes) {
+            if (node._id === id) { node.expanded = !node.expanded; return true; }
+            if (node.children && this.toggleNode(node.children, id)) return true;
+        }
+        return false;
+    },
+
+    onBorrow(e) {
         const device = e.currentTarget.dataset.device;
+        if (device.availableQuantity <= 0) {
+            util.showError('暂无可用设备');
+            return;
+        }
         wx.navigateTo({
-            url: `/pages/borrow/borrow?deviceId=${device._id}&deviceName=${device.name}&availableQuantity=${device.availableQuantity}`
+            url: `/pages/borrow/borrow?deviceId=${device._id}&deviceName=${encodeURIComponent(device.fullPath || device.name)}&availableQuantity=${device.availableQuantity}`
         });
     }
 });

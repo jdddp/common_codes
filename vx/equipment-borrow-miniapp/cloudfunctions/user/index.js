@@ -13,13 +13,13 @@ exports.main = async (event, context) => {
     const wxContext = cloud.getWXContext();
 
     try {
-        const token = wxContext.token || wxContext.TOKEN;
+        const token = event.token;
         if (!token) {
             return { code: -1, message: '未登录' };
         }
 
         const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, 'your-jwt-secret-key');
+        const decoded = jwt.verify(token, 'A2CF692946145E42362A1BA63DAAC972457CC0CC6ED9B7D7FCD2FB250F33B7F7');
 
         const userResult = await db.collection('user').doc(decoded.userId).get();
         if (!userResult.data || userResult.data.role !== 'admin') {
@@ -87,9 +87,9 @@ async function listUsers(event) {
 }
 
 async function createUser(event) {
-    const { username, phone, name, department, role, password } = event;
+    const { phone, name, department, role, password } = event;
 
-    if (!username || !phone || !name || !password) {
+    if (!phone || !name || !password) {
         return { code: -1, message: '必填字段不能为空' };
     }
 
@@ -116,7 +116,7 @@ async function createUser(event) {
 
         const result = await db.collection('user').add({
             data: {
-                username,
+                username: phone,
                 phone,
                 name,
                 department: department || '',

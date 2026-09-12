@@ -1,0 +1,23 @@
+<view class="edit-container">
+    <view class="form-group">
+        <view class="form-label">设备名称 <text class="required">*</text></view>
+        <input class="form-input" placeholder="请输入设备名称" value="{{name}}" bindinput="onNameInput" />
+    </view>
+
+    <view class="form-group">
+        <view class="form-label">所属分类 <text class="required">*</text></view>
+        <picker bindchange="onCategoryChange" value="{{categoryIndex}}" range="{{categories}}" range-key="name">
+            <view class="form-input picker-input {{categories[categoryIndex] ? '' : 'placeholder'}}">
+                {{categories[categoryIndex] ? categories[categoryIndex].name : '请选择三级分类'}}
+            </view>
+        </picker>
+        <view class="form-hint">只能选择三级分类</view>
+    </view>
+
+    <view class="form-group">
+        <view class="form-label">备注</view>
+        <textarea class="form-textarea" placeholder="请输入备注（选填）" value="{{remark}}" bindinput="onRemarkInput" />
+    </view>
+
+    <button class="submit-btn" bindtap="handleSubmit" loading="{{loading}}">{{isEdit ? '保存' : '创建'}}</button>
+</view>

@@ -1,80 +1,117 @@
 <view class="device-container">
     <view class="search-bar">
-        <input
-            class="search-input"
-            placeholder="搜索设备"
-            value="{{keyword}}"
-            bindinput="onSearchInput"
-            bindconfirm="onSearch"
-        />
+        <input class="search-input" placeholder="搜索设备（支持所有层级）"
+            value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearch" />
         <view class="search-btn" bindtap="onSearch">搜索</view>
     </view>
 
-    <view class="category-filter">
-        <scroll-view scroll-x class="category-scroll">
-            <view
-                class="category-item {{currentCategory === '' ? 'active' : ''}}"
-                bindtap="onCategoryTap"
-                data-id=""
-            >
-                全部
+    <view class="device-tree" wx:if="{{filteredTree.length > 0}}">
+        <block wx:for="{{filteredTree}}" wx:key="_id">
+            <view class="tree-card level-1">
+                <view class="tree-header" bindtap="onToggleNode" data-id="{{item._id}}">
+                    <text class="expand-icon" wx:if="{{item.children.length > 0 || item.devices.length > 0}}">
+                        {{item.expanded ? '▼' : '▶'}}
+                    </text>
+                    <text class="tree-name">{{item.name}}</text>
+                </view>
+
+                <view class="tree-children" wx:if="{{item.expanded}}">
+                    <view wx:for="{{item.devices}}" wx:for-item="device" wx:key="_id" class="device-card">
+                        <view class="device-path" wx:if="{{device.fullPath}}">{{device.fullPath}}</view>
+                        <view class="device-main">
+                            <view class="device-name">{{device.name}}</view>
+                            <view class="device-nums">
+                                <view class="num-item">
+                                    <text class="num-label">可用</text>
+                                    <text class="num-value ok">{{device.availableQuantity}}</text>
+                                </view>
+                                <view class="num-item">
+                                    <text class="num-label">总数</text>
+                                    <text class="num-value">{{device.totalQuantity}}</text>
+                                </view>
+                            </view>
+                        </view>
+                        <view class="device-action">
+                            <button class="borrow-btn" bindtap="onBorrow" data-device="{{device}}"
+                                disabled="{{device.availableQuantity <= 0}}">
+                                {{device.availableQuantity > 0 ? '借用' : '暂无'}}
+                            </button>
+                        </view>
+                    </view>
+
+                    <view wx:for="{{item.children}}" wx:for-item="child" wx:key="_id" class="tree-card level-2">
+                        <view class="tree-header" bindtap="onToggleNode" data-id="{{child._id}}">
+                            <text class="expand-icon" wx:if="{{child.children.length > 0 || child.devices.length > 0}}">
+                                {{child.expanded ? '▼' : '▶'}}
+                            </text>
+                            <text class="tree-name">{{child.name}}</text>
+                        </view>
+
+                        <view class="tree-children" wx:if="{{child.expanded}}">
+                            <view wx:for="{{child.devices}}" wx:for-item="device" wx:key="_id" class="device-card">
+                                <view class="device-path" wx:if="{{device.fullPath}}">{{device.fullPath}}</view>
+                                <view class="device-main">
+                                    <view class="device-name">{{device.name}}</view>
+                                    <view class="device-nums">
+                                        <view class="num-item">
+                                            <text class="num-label">可用</text>
+                                            <text class="num-value ok">{{device.availableQuantity}}</text>
+                                        </view>
+                                        <view class="num-item">
+                                            <text class="num-label">总数</text>
+                                            <text class="num-value">{{device.totalQuantity}}</text>
+                                        </view>
+                                    </view>
+                                </view>
+                                <view class="device-action">
+                                    <button class="borrow-btn" bindtap="onBorrow" data-device="{{device}}"
+                                        disabled="{{device.availableQuantity <= 0}}">
+                                        {{device.availableQuantity > 0 ? '借用' : '暂无'}}
+                                    </button>
+                                </view>
+                            </view>
+
+                            <view wx:for="{{child.children}}" wx:for-item="gchild" wx:key="_id" class="tree-card level-3">
+                                <view class="tree-header" bindtap="onToggleNode" data-id="{{gchild._id}}">
+                                    <text class="expand-icon" wx:if="{{gchild.devices.length > 0}}">
+                                        {{gchild.expanded ? '▼' : '▶'}}
+                                    </text>
+                                    <text class="tree-name">{{gchild.name}}</text>
+                                </view>
+                                <view class="tree-children" wx:if="{{gchild.expanded}}">
+                                    <view wx:for="{{gchild.devices}}" wx:for-item="device" wx:key="_id" class="device-card">
+                                        <view class="device-path" wx:if="{{device.fullPath}}">{{device.fullPath}}</view>
+                                        <view class="device-main">
+                                            <view class="device-name">{{device.name}}</view>
+                                            <view class="device-nums">
+                                                <view class="num-item">
+                                                    <text class="num-label">可用</text>
+                                                    <text class="num-value ok">{{device.availableQuantity}}</text>
+                                                </view>
+                                                <view class="num-item">
+                                                    <text class="num-label">总数</text>
+                                                    <text class="num-value">{{device.totalQuantity}}</text>
+                                                </view>
+                                            </view>
+                                        </view>
+                                        <view class="device-action">
+                                            <button class="borrow-btn" bindtap="onBorrow" data-device="{{device}}"
+                                                disabled="{{device.availableQuantity <= 0}}">
+                                                {{device.availableQuantity > 0 ? '借用' : '暂无'}}
+                                            </button>
+                                        </view>
+                                    </view>
+                                </view>
+                            </view>
+                        </view>
+                    </view>
+                </view>
             </view>
-            <view
-                wx:for="{{categories}}"
-                wx:key="_id"
-                class="category-item {{currentCategory === item._id ? 'active' : ''}}"
-                bindtap="onCategoryTap"
-                data-id="{{item._id}}"
-            >
-                {{item.name}}
-            </view>
-        </scroll-view>
+        </block>
     </view>
 
-    <view class="device-list">
-        <view
-            wx:for="{{devices}}"
-            wx:key="_id"
-            class="device-card"
-            bindtap="onDeviceTap"
-            data-device="{{item}}"
-        >
-            <view class="device-header">
-                <view class="device-name">{{item.name}}</view>
-                <view class="device-status {{item.status === 'active' ? 'status-active' : 'status-disabled'}}">
-                    {{item.status === 'active' ? '可用' : '已禁用'}}
-                </view>
-            </view>
-
-            <view class="device-info">
-                <view class="info-item">
-                    <text class="info-label">总数</text>
-                    <text class="info-value">{{item.totalQuantity}}</text>
-                </view>
-                <view class="info-item">
-                    <text class="info-label">已借</text>
-                    <text class="info-value text-warning">{{item.borrowedQuantity}}</text>
-                </view>
-                <view class="info-item">
-                    <text class="info-label">可用</text>
-                    <text class="info-value text-success">{{item.availableQuantity}}</text>
-                </view>
-            </view>
-
-            <view class="device-action" wx:if="{{item.status === 'active' && item.availableQuantity > 0}}">
-                <button class="btn-primary borrow-btn" catchtap="onBorrowTap" data-device="{{item}}">
-                    借用
-                </button>
-            </view>
-        </view>
-
-        <view class="empty-state" wx:if="{{devices.length === 0 && !loading}}">
-            <view class="empty-icon">📭</view>
-            <view class="empty-text">暂无设备</view>
-        </view>
-    </view>
-
-    <view class="loading-more" wx:if="{{loading}}">
-        <view class="loading-text">加载中...</view>
+    <view class="empty-state" wx:if="{{filteredTree.length === 0 && !loading}}">
+        <view class="empty-icon">📭</view>
+        <view class="empty-text">{{keyword ? '未找到匹配设备' : '暂无设备'}}</view>
     </view>
 </view>

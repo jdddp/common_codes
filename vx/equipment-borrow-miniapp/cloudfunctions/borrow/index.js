@@ -21,14 +21,14 @@ exports.main = async (event, context) => {
     }
 };
 
-async function getCurrentUser(wxContext) {
-    const token = wxContext.token || wxContext.TOKEN;
+async function getCurrentUser(event) {
+    const token = event.token;
     if (!token) {
         return { code: -1, message: '未登录' };
     }
 
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, 'your-jwt-secret-key');
+    const decoded = jwt.verify(token, 'A2CF692946145E42362A1BA63DAAC972457CC0CC6ED9B7D7FCD2FB250F33B7F7');
 
     const userResult = await db.collection('user').doc(decoded.userId).get();
     if (!userResult.data) {
@@ -59,7 +59,7 @@ async function borrowDevice(event, wxContext) {
         return { code: -1, message: '借用数量必须大于0' };
     }
 
-    const userCheck = await getCurrentUser(wxContext);
+    const userCheck = await getCurrentUser(event);
     if (userCheck.code !== 0) return userCheck;
 
     const user = userCheck.user;
@@ -127,18 +127,21 @@ async function borrowDevice(event, wxContext) {
 async function listMyBorrowings(event, wxContext) {
     const { page = 1, pageSize = 20, status = '' } = event;
 
-    const userCheck = await getCurrentUser(wxContext);
+    const userCheck = await getCurrentUser(event);
     if (userCheck.code !== 0) return userCheck;
 
     const user = userCheck.user;
 
     try {
-        let query = db.collection('borrow_record')
-            .where({ userId: user._id });
+        const condition = { userId: user._id };
 
-        if (status) {
-            query = query.where({ status });
+        if (status === 'borrowing') {
+            condition.status = _.in(['borrowing', 'partially_returned']);
+        } else if (status) {
+            condition.status = status;
         }
+
+        const query = db.collection('borrow_record').where(condition);
 
         const countResult = await query.count();
         const total = countResult.total;
@@ -151,13 +154,25 @@ async function listMyBorrowings(event, wxContext) {
 
         const borrowings = result.data;
 
+        const catResult = await db.collection('category').limit(1000).get();
+        const catMap = {};
+        catResult.data.forEach(c => catMap[c._id] = c);
+
         for (let borrowing of borrowings) {
             const deviceResult = await db.collection('device_type')
                 .doc(borrowing.deviceTypeId)
                 .get();
 
             if (deviceResult.data) {
-                borrowing.deviceName = deviceResult.data.name;
+                const parts = [];
+                let current = catMap[deviceResult.data.categoryId];
+                while (current) {
+                    parts.unshift(current.name);
+                    current = current.parentId ? catMap[current.parentId] : null;
+                }
+                borrowing.deviceName = parts.length > 0
+                    ? parts.join(' > ')
+                    : deviceResult.data.name;
             }
         }
 

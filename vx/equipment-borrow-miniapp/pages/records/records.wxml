@@ -78,6 +78,18 @@
                     <text class="user-label">借用人</text>
                     <text class="user-value">{{item.userName}} ({{item.userPhone}})</text>
                 </view>
+                <view class="user-item" wx:if="{{item.userDepartment}}">
+                    <text class="user-label">部门</text>
+                    <text class="user-value">{{item.userDepartment}}</text>
+                </view>
+            </view>
+
+            <view class="record-return" wx:if="{{item.returnRecords && item.returnRecords.length > 0}}">
+                <view class="return-header">归还记录</view>
+                <view class="return-item" wx:for="{{item.returnRecords}}" wx:for-item="ret" wx:key="_id">
+                    <text class="return-time">{{ret.returnTime}}</text>
+                    <text class="return-qty">归还 {{ret.quantity}} 个</text>
+                </view>
             </view>
         </view>
 

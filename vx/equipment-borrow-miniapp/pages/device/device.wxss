@@ -1,10 +1,12 @@
 .device-container {
     min-height: 100vh;
     background-color: #f5f5f5;
+    padding-bottom: 40rpx;
 }
 
 .search-bar {
     display: flex;
+    align-items: center;
     padding: 20rpx;
     background-color: white;
 }
@@ -12,126 +14,147 @@
 .search-input {
     flex: 1;
     height: 72rpx;
-    border: 1rpx solid #d9d9d9;
-    border-radius: 8rpx;
-    padding: 0 20rpx;
+    background-color: #f5f5f5;
+    border-radius: 36rpx;
+    padding: 0 24rpx;
     font-size: 28rpx;
 }
 
 .search-btn {
-    width: 120rpx;
-    height: 72rpx;
-    line-height: 72rpx;
-    text-align: center;
-    background-color: #1890ff;
-    color: white;
-    border-radius: 8rpx;
     margin-left: 16rpx;
+    color: #1890ff;
     font-size: 28rpx;
+    padding: 0 16rpx;
 }
 
-.category-filter {
+.device-tree {
+    padding: 20rpx;
+}
+
+.tree-card {
     background-color: white;
-    padding: 20rpx;
-    border-bottom: 1rpx solid #f0f0f0;
+    border-radius: 12rpx;
+    margin-bottom: 16rpx;
+    overflow: hidden;
 }
 
-.category-scroll {
-    white-space: nowrap;
+.tree-card.level-1 {
+    border-left: 6rpx solid #1890ff;
 }
 
-.category-item {
-    display: inline-block;
-    padding: 12rpx 24rpx;
-    margin-right: 16rpx;
-    border-radius: 32rpx;
-    font-size: 26rpx;
-    color: #666;
-    background-color: #f5f5f5;
+.tree-card.level-2 {
+    margin: 0 16rpx 12rpx;
+    background-color: #fafafa;
+    border-left: 6rpx solid #52c41a;
 }
 
-.category-item.active {
-    background-color: #1890ff;
-    color: white;
+.tree-card.level-3 {
+    margin: 0 16rpx 10rpx;
+    background-color: white;
+    border-left: 6rpx solid #faad14;
 }
 
-.device-list {
-    padding: 20rpx;
+.tree-header {
+    display: flex;
+    align-items: center;
+    padding: 24rpx 20rpx;
+}
+
+.tree-header:active {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.expand-icon {
+    font-size: 24rpx;
+    color: #999;
+    margin-right: 12rpx;
+    width: 24rpx;
+}
+
+.tree-name {
+    font-size: 30rpx;
+    color: #333;
+    flex: 1;
+}
+
+.level-1 > .tree-header .tree-name {
+    font-weight: bold;
+    font-size: 32rpx;
+}
+
+.level-2 > .tree-header .tree-name {
+    font-weight: 500;
+}
+
+.tree-children {
+    padding: 0 0 8rpx;
 }
 
 .device-card {
+    margin: 12rpx 20rpx;
     background-color: white;
-    border-radius: 12rpx;
-    padding: 24rpx;
-    margin-bottom: 20rpx;
-    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+    border-radius: 8rpx;
+    padding: 20rpx;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-.device-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20rpx;
+.device-path {
+    display: none;
+}
+
+.device-main {
+    flex: 1;
 }
 
 .device-name {
-    font-size: 32rpx;
-    font-weight: bold;
+    font-size: 28rpx;
+    font-weight: 500;
     color: #333;
-}
-
-.device-status {
-    font-size: 24rpx;
-    padding: 4rpx 16rpx;
-    border-radius: 16rpx;
-}
-
-.status-active {
-    background-color: #f6ffed;
-    color: #52c41a;
-}
-
-.status-disabled {
-    background-color: #fff2f0;
-    color: #ff4d4f;
-}
-
-.device-info {
-    display: flex;
-    justify-content: space-around;
-    margin-bottom: 20rpx;
-    padding: 20rpx 0;
-    border-top: 1rpx solid #f0f0f0;
-    border-bottom: 1rpx solid #f0f0f0;
-}
-
-.info-item {
-    text-align: center;
-}
-
-.info-label {
-    font-size: 24rpx;
-    color: #999;
-    display: block;
     margin-bottom: 8rpx;
 }
 
-.info-value {
-    font-size: 32rpx;
-    font-weight: bold;
+.device-nums {
+    display: flex;
+}
+
+.num-item {
+    margin-right: 24rpx;
+}
+
+.num-label {
+    font-size: 22rpx;
+    color: #999;
+    margin-right: 4rpx;
+}
+
+.num-value {
+    font-size: 24rpx;
     color: #333;
 }
 
+.num-value.ok {
+    color: #52c41a;
+    font-weight: bold;
+}
+
 .device-action {
-    text-align: right;
+    margin-left: 16rpx;
 }
 
 .borrow-btn {
-    display: inline-block;
-    width: 160rpx;
-    height: 64rpx;
-    line-height: 64rpx;
-    font-size: 28rpx;
+    font-size: 24rpx;
+    color: white;
+    background-color: #1890ff;
+    border-radius: 8rpx;
+    padding: 12rpx 24rpx;
+    line-height: 1;
+}
+
+.borrow-btn[disabled] {
+    background-color: #d9d9d9;
+    color: #999;
 }
 
 .empty-state {
@@ -146,15 +169,5 @@
 
 .empty-text {
     font-size: 28rpx;
-    color: #999;
-}
-
-.loading-more {
-    text-align: center;
-    padding: 20rpx;
-}
-
-.loading-text {
-    font-size: 24rpx;
     color: #999;
 }

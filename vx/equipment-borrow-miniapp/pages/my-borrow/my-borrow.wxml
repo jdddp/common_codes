@@ -1,25 +1,11 @@
 <view class="my-borrow-container">
     <view class="tab-bar">
         <view
-            class="tab-item {{currentTab === '' ? 'active' : ''}}"
-            bindtap="onTabTap"
-            data-tab=""
-        >
-            全部
-        </view>
-        <view
             class="tab-item {{currentTab === 'borrowing' ? 'active' : ''}}"
             bindtap="onTabTap"
             data-tab="borrowing"
         >
             借用中
-        </view>
-        <view
-            class="tab-item {{currentTab === 'partially_returned' ? 'active' : ''}}"
-            bindtap="onTabTap"
-            data-tab="partially_returned"
-        >
-            部分归还
         </view>
         <view
             class="tab-item {{currentTab === 'returned' ? 'active' : ''}}"

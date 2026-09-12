@@ -52,6 +52,9 @@
     font-size: 32rpx;
     font-weight: bold;
     color: #333;
+    flex: 1;
+    word-break: break-all;
+    padding-right: 16rpx;
 }
 
 .record-status {
@@ -66,13 +69,18 @@
 }
 
 .status-partially_returned {
-    background-color: #fff7e6;
-    color: #faad14;
+    background-color: #e6f7ff;
+    color: #1890ff;
 }
 
 .status-returned {
     background-color: #f6ffed;
     color: #52c41a;
+}
+
+.status-cancelled {
+    background-color: #f5f5f5;
+    color: #999;
 }
 
 .record-info {
@@ -98,6 +106,10 @@
     font-size: 32rpx;
     font-weight: bold;
     color: #333;
+}
+
+.text-warning {
+    color: #faad14;
 }
 
 .record-time {
@@ -128,6 +140,7 @@
 .user-item {
     display: flex;
     justify-content: space-between;
+    margin-bottom: 8rpx;
 }
 
 .user-label {
@@ -138,6 +151,34 @@
 .user-value {
     font-size: 24rpx;
     color: #666;
+}
+
+.record-return {
+    margin-top: 16rpx;
+    padding-top: 16rpx;
+    border-top: 1rpx solid #f0f0f0;
+}
+
+.return-header {
+    font-size: 24rpx;
+    color: #999;
+    margin-bottom: 12rpx;
+}
+
+.return-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 24rpx;
+    color: #666;
+    margin-bottom: 8rpx;
+}
+
+.return-time {
+    color: #999;
+}
+
+.return-qty {
+    color: #52c41a;
 }
 
 .empty-state {

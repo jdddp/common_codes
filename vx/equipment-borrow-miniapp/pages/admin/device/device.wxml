@@ -1,80 +1,71 @@
 <view class="admin-device-container">
     <view class="header-section">
         <view class="section-title">设备管理</view>
-        <view class="header-actions">
-            <button class="btn-primary add-btn" bindtap="onAddCategory">新增分类</button>
-            <button class="btn-primary add-btn" bindtap="onAddDevice">新增设备</button>
-        </view>
+        <button class="btn-primary add-btn" bindtap="onAddCategory" data-parentid="" data-level="1">新增分类</button>
     </view>
 
-    <view class="category-tree">
-        <view
-            wx:for="{{categories}}"
-            wx:key="_id"
-            class="category-level-1"
-        >
-            <view class="category-item" bindtap="onCategoryTap" data-category="{{item}}">
-                <view class="category-name">
-                    <text class="expand-icon">{{item.expanded ? '▼' : '▶'}}</text>
-                    {{item.name}}
+    <view class="category-tree" wx:if="{{tree.length > 0}}">
+        <block wx:for="{{tree}}" wx:key="_id">
+            <view class="cat-card level-1">
+                <view class="cat-header" bindtap="onToggleNode" data-id="{{item._id}}">
+                    <text class="expand-icon" wx:if="{{item.children.length > 0}}">{{item.expanded ? '▼' : '▶'}}</text>
+                    <text class="cat-name">{{item.name}}</text>
                 </view>
-                <view class="category-actions">
-                    <text class="action-btn" catchtap="onEditCategory" data-category="{{item}}">编辑</text>
+                <view class="device-nums" wx:if="{{item.device}}">
+                    <view class="num-item"><text class="num-label">总数</text><text class="num-value">{{item.device.totalQuantity}}</text></view>
+                    <view class="num-item"><text class="num-label">已借</text><text class="num-value warn">{{item.device.borrowedQuantity}}</text></view>
+                    <view class="num-item"><text class="num-label">可用</text><text class="num-value ok">{{item.device.availableQuantity}}</text></view>
                 </view>
-            </view>
+                <view class="cat-actions">
+                    <text class="act-btn" catchtap="onEditCategory" data-category="{{item}}">编辑</text>
+                    <text class="act-btn green" catchtap="onAddCategory" data-parentid="{{item._id}}" data-level="2">+子分类</text>
+                    <text class="act-btn orange" wx:if="{{item.children.length === 0}}" catchtap="onQuantitySet" data-id="{{item._id}}">数量设置</text>
+                    <text class="act-btn red" catchtap="onDeleteCategory" data-category="{{item}}">删除</text>
+                </view>
 
-            <view class="sub-categories" wx:if="{{item.expanded}}">
-                <view
-                    wx:for="{{item.children}}"
-                    wx:for-item="child"
-                    wx:key="_id"
-                    class="category-level-2"
-                >
-                    <view class="category-item" bindtap="onSubCategoryTap" data-category="{{child}}">
-                        <view class="category-name">
-                            <text class="expand-icon">{{child.expanded ? '▼' : '▶'}}</text>
-                            {{child.name}}
+                <view class="cat-children" wx:if="{{item.expanded}}">
+                    <view wx:for="{{item.children}}" wx:for-item="child" wx:key="_id" class="cat-card level-2">
+                        <view class="cat-header" bindtap="onToggleNode" data-id="{{child._id}}">
+                            <text class="expand-icon" wx:if="{{child.children.length > 0}}">{{child.expanded ? '▼' : '▶'}}</text>
+                            <text class="cat-name">{{child.name}}</text>
                         </view>
-                        <view class="category-actions">
-                            <text class="action-btn" catchtap="onEditCategory" data-category="{{child}}">编辑</text>
+                        <view class="device-nums" wx:if="{{child.device}}">
+                            <view class="num-item"><text class="num-label">总数</text><text class="num-value">{{child.device.totalQuantity}}</text></view>
+                            <view class="num-item"><text class="num-label">已借</text><text class="num-value warn">{{child.device.borrowedQuantity}}</text></view>
+                            <view class="num-item"><text class="num-label">可用</text><text class="num-value ok">{{child.device.availableQuantity}}</text></view>
                         </view>
-                    </view>
+                        <view class="cat-actions">
+                            <text class="act-btn" catchtap="onEditCategory" data-category="{{child}}">编辑</text>
+                            <text class="act-btn green" catchtap="onAddCategory" data-parentid="{{child._id}}" data-level="3">+子分类</text>
+                            <text class="act-btn orange" wx:if="{{child.children.length === 0}}" catchtap="onQuantitySet" data-id="{{child._id}}">数量设置</text>
+                            <text class="act-btn red" catchtap="onDeleteCategory" data-category="{{child}}">删除</text>
+                        </view>
 
-                    <view class="device-list" wx:if="{{child.expanded}}">
-                        <view
-                            wx:for="{{child.devices}}"
-                            wx:for-item="device"
-                            wx:key="_id"
-                            class="device-item"
-                        >
-                            <view class="device-info">
-                                <view class="device-name">{{device.name}}</view>
-                                <view class="device-quantity">
-                                    <text>总数：{{device.totalQuantity}}</text>
-                                    <text>已借：{{device.borrowedQuantity}}</text>
-                                    <text>可用：{{device.availableQuantity}}</text>
+                        <view class="cat-children" wx:if="{{child.expanded}}">
+                            <view wx:for="{{child.children}}" wx:for-item="gchild" wx:key="_id" class="cat-card level-3">
+                                <view class="cat-header">
+                                    <text class="cat-name">{{gchild.name}}</text>
+                                </view>
+                                <view class="device-nums" wx:if="{{gchild.device}}">
+                                    <view class="num-item"><text class="num-label">总数</text><text class="num-value">{{gchild.device.totalQuantity}}</text></view>
+                                    <view class="num-item"><text class="num-label">已借</text><text class="num-value warn">{{gchild.device.borrowedQuantity}}</text></view>
+                                    <view class="num-item"><text class="num-label">可用</text><text class="num-value ok">{{gchild.device.availableQuantity}}</text></view>
+                                </view>
+                                <view class="cat-actions">
+                                    <text class="act-btn" catchtap="onEditCategory" data-category="{{gchild}}">编辑</text>
+                                    <text class="act-btn orange" catchtap="onQuantitySet" data-id="{{gchild._id}}">数量设置</text>
+                                    <text class="act-btn red" catchtap="onDeleteCategory" data-category="{{gchild}}">删除</text>
                                 </view>
                             </view>
-                            <view class="device-actions">
-                                <text class="action-btn" catchtap="onEditDevice" data-device="{{device}}">编辑</text>
-                                <text class="action-btn" catchtap="onUpdateQuantity" data-device="{{device}}">数量</text>
-                                <text
-                                    class="action-btn {{device.status === 'active' ? 'text-danger' : 'text-success'}}"
-                                    catchtap="onToggleDeviceStatus"
-                                    data-device="{{device}}"
-                                >
-                                    {{device.status === 'active' ? '禁用' : '启用'}}
-                                </text>
-                            </view>
                         </view>
                     </view>
                 </view>
             </view>
-        </view>
+        </block>
     </view>
 
-    <view class="empty-state" wx:if="{{categories.length === 0 && !loading}}">
+    <view class="empty-state" wx:if="{{tree.length === 0 && !loading}}">
         <view class="empty-icon">📭</view>
-        <view class="empty-text">暂无分类</view>
+        <view class="empty-text">暂无分类，请先新增分类</view>
     </view>
 </view>

@@ -1,0 +1,30 @@
+<view class="edit-container">
+    <view class="form-group">
+        <view class="form-label">姓名</view>
+        <input class="form-input" placeholder="请输入姓名" value="{{name}}" bindinput="onNameInput" />
+    </view>
+
+    <view class="form-group">
+        <view class="form-label">手机号</view>
+        <input class="form-input" placeholder="请输入手机号" type="number" maxlength="11" value="{{phone}}" bindinput="onPhoneInput" />
+    </view>
+
+    <view class="form-group">
+        <view class="form-label">部门</view>
+        <input class="form-input" placeholder="请输入部门" value="{{department}}" bindinput="onDepartmentInput" />
+    </view>
+
+    <view class="form-group">
+        <view class="form-label">角色</view>
+        <picker bindchange="onRoleChange" value="{{role === 'admin' ? 1 : 0}}" range="{{['普通用户', '管理员']}}">
+            <view class="form-input picker-input">{{role === 'admin' ? '管理员' : '普通用户'}}</view>
+        </picker>
+    </view>
+
+    <view class="form-group" wx:if="{{!isEdit}}">
+        <view class="form-label">初始密码</view>
+        <input class="form-input" placeholder="至少8位" password value="{{password}}" bindinput="onPasswordInput" />
+    </view>
+
+    <button class="submit-btn" bindtap="handleSubmit" loading="{{loading}}">{{isEdit ? '保存' : '创建'}}</button>
+</view>

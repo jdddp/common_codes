@@ -14,38 +14,68 @@ exports.main = async (event, context) => {
     switch (action) {
         case 'listCategories':
             return await listCategories(event);
+        case 'listAllCategories':
+            return await listAllCategories(event);
         case 'createCategory':
-            return await createCategory(event, wxContext);
+            return await createCategory(event);
         case 'updateCategory':
-            return await updateCategory(event, wxContext);
+            return await updateCategory(event);
         case 'listDevices':
             return await listDevices(event);
+        case 'listAllDevices':
+            return await listAllDevices(event);
         case 'createDevice':
-            return await createDevice(event, wxContext);
+            return await createDevice(event);
+        case 'quickCreateDevice':
+            return await quickCreateDevice(event);
         case 'updateDevice':
-            return await updateDevice(event, wxContext);
+            return await updateDevice(event);
         case 'updateDeviceQuantity':
-            return await updateDeviceQuantity(event, wxContext);
+            return await updateDeviceQuantity(event);
         case 'disableDevice':
-            return await disableDevice(event, wxContext);
+            return await disableDevice(event);
         case 'enableDevice':
-            return await enableDevice(event, wxContext);
+            return await enableDevice(event);
+        case 'deleteCategory':
+            return await deleteCategory(event);
+        case 'deleteDevice':
+            return await deleteDevice(event);
+        case 'createDeviceWithCategory':
+            return await createDeviceWithCategory(event);
+        case 'createDeviceForCategory':
+            return await createDeviceForCategory(event);
+        case 'deleteDeviceCategory':
+            return await deleteDeviceCategory(event);
         default:
             return { code: -1, message: '未知操作' };
     }
 };
 
-async function checkAdmin(wxContext) {
-    const token = wxContext.token || wxContext.TOKEN;
+async function checkAdmin(event) {
+    const token = event.token;
     if (!token) {
         return { code: -1, message: '未登录' };
     }
 
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, 'your-jwt-secret-key');
+    const decoded = jwt.verify(token, 'A2CF692946145E42362A1BA63DAAC972457CC0CC6ED9B7D7FCD2FB250F33B7F7');
 
     const userResult = await db.collection('user').doc(decoded.userId).get();
-    if (!userResult.data || userResult.data.role !== 'admin') {
+    if (!userResult.data) {
+        return { code: -1, message: '用户不存在' };
+    }
+
+    const user = userResult.data;
+
+    if (user.status === 'disabled') {
+        return { code: -1, message: '账号已被禁用' };
+    }
+
+    if (user.passwordVersion !== decoded.passwordVersion) {
+        return { code: -1, message: '登录已失效，请重新登录' };
+    }
+
+    if (user.role !== 'admin') {
         return { code: -1, message: '无管理员权限' };
     }
 
@@ -76,8 +106,23 @@ async function listCategories(event) {
     }
 }
 
-async function createCategory(event, wxContext) {
-    const adminCheck = await checkAdmin(wxContext);
+async function listAllCategories(event) {
+    try {
+        const result = await db.collection('category')
+            .orderBy('level', 'asc')
+            .orderBy('sort', 'asc')
+            .orderBy('createdAt', 'asc')
+            .get();
+
+        return { code: 0, data: result.data };
+    } catch (error) {
+        console.error('获取全部分类失败:', error);
+        return { code: -1, message: '获取分类失败' };
+    }
+}
+
+async function createCategory(event) {
+    const adminCheck = await checkAdmin(event);
     if (adminCheck.code !== 0) return adminCheck;
 
     const { name, parentId, level, sort } = event;
@@ -87,16 +132,20 @@ async function createCategory(event, wxContext) {
     }
 
     try {
+        const queryObj = { name };
+        if (parentId) {
+            queryObj.parentId = parentId;
+        } else {
+            queryObj.parentId = _.in([null, '']);
+        }
+
         const existingCategory = await db.collection('category')
-            .where({
-                name,
-                parentId: parentId || ''
-            })
+            .where(queryObj)
             .limit(1)
             .get();
 
         if (existingCategory.data.length > 0) {
-            return { code: -1, message: '分类名称已存在' };
+            return { code: -1, message: '同级分类名称已存在' };
         }
 
         const result = await db.collection('category').add({
@@ -118,8 +167,8 @@ async function createCategory(event, wxContext) {
     }
 }
 
-async function updateCategory(event, wxContext) {
-    const adminCheck = await checkAdmin(wxContext);
+async function updateCategory(event) {
+    const adminCheck = await checkAdmin(event);
     if (adminCheck.code !== 0) return adminCheck;
 
     const { categoryId, name, sort } = event;
@@ -148,7 +197,7 @@ async function updateCategory(event, wxContext) {
 }
 
 async function listDevices(event) {
-    const { categoryId, page = 1, pageSize = 20, status = 'active' } = event;
+    const { categoryId, keyword, page = 1, pageSize = 20, status = 'active' } = event;
 
     try {
         let query = db.collection('device_type');
@@ -172,6 +221,15 @@ async function listDevices(event) {
 
         const devices = result.data;
 
+        const catIds = [...new Set(devices.map(d => d.categoryId))];
+        const catMap = {};
+        if (catIds.length > 0) {
+            const catResult = await db.collection('category')
+                .where({ _id: _.in(catIds) })
+                .get();
+            catResult.data.forEach(c => catMap[c._id] = c);
+        }
+
         for (let device of devices) {
             const borrowResult = await db.collection('borrow_record')
                 .where({
@@ -187,12 +245,28 @@ async function listDevices(event) {
 
             device.borrowedQuantity = borrowedQuantity;
             device.availableQuantity = device.totalQuantity - borrowedQuantity;
+
+            const parts = [];
+            let cat = catMap[device.categoryId];
+            while (cat) {
+                parts.unshift(cat.name);
+                cat = cat.parentId ? catMap[cat.parentId] : null;
+            }
+            device.fullPath = parts.join(' > ');
+        }
+
+        let filtered = devices;
+        if (keyword) {
+            filtered = devices.filter(d =>
+                d.name.toLowerCase().includes(keyword.toLowerCase()) ||
+                d.fullPath.toLowerCase().includes(keyword.toLowerCase())
+            );
         }
 
         return {
             code: 0,
             data: {
-                list: devices,
+                list: filtered,
                 total,
                 page,
                 pageSize
@@ -204,8 +278,8 @@ async function listDevices(event) {
     }
 }
 
-async function createDevice(event, wxContext) {
-    const adminCheck = await checkAdmin(wxContext);
+async function createDevice(event) {
+    const adminCheck = await checkAdmin(event);
     if (adminCheck.code !== 0) return adminCheck;
 
     const { name, categoryId, totalQuantity, remark } = event;
@@ -250,8 +324,8 @@ async function createDevice(event, wxContext) {
     }
 }
 
-async function updateDevice(event, wxContext) {
-    const adminCheck = await checkAdmin(wxContext);
+async function updateDevice(event) {
+    const adminCheck = await checkAdmin(event);
     if (adminCheck.code !== 0) return adminCheck;
 
     const { deviceId, name, categoryId, remark } = event;
@@ -280,8 +354,8 @@ async function updateDevice(event, wxContext) {
     }
 }
 
-async function updateDeviceQuantity(event, wxContext) {
-    const adminCheck = await checkAdmin(wxContext);
+async function updateDeviceQuantity(event) {
+    const adminCheck = await checkAdmin(event);
     if (adminCheck.code !== 0) return adminCheck;
 
     const { deviceId, totalQuantity } = event;
@@ -335,8 +409,8 @@ async function updateDeviceQuantity(event, wxContext) {
     }
 }
 
-async function disableDevice(event, wxContext) {
-    const adminCheck = await checkAdmin(wxContext);
+async function disableDevice(event) {
+    const adminCheck = await checkAdmin(event);
     if (adminCheck.code !== 0) return adminCheck;
 
     const { deviceId } = event;
@@ -360,8 +434,8 @@ async function disableDevice(event, wxContext) {
     }
 }
 
-async function enableDevice(event, wxContext) {
-    const adminCheck = await checkAdmin(wxContext);
+async function enableDevice(event) {
+    const adminCheck = await checkAdmin(event);
     if (adminCheck.code !== 0) return adminCheck;
 
     const { deviceId } = event;
@@ -382,5 +456,277 @@ async function enableDevice(event, wxContext) {
     } catch (error) {
         console.error('启用设备失败:', error);
         return { code: -1, message: '启用设备失败' };
+    }
+}
+
+async function listAllDevices(event) {
+    try {
+        const result = await db.collection('device_type')
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        const devices = result.data;
+        for (let device of devices) {
+            const borrowResult = await db.collection('borrow_record')
+                .where({
+                    deviceTypeId: device._id,
+                    status: _.in(['borrowing', 'partially_returned'])
+                })
+                .get();
+
+            let borrowedQuantity = 0;
+            for (let record of borrowResult.data) {
+                borrowedQuantity += record.quantity - record.returnedQuantity;
+            }
+            device.borrowedQuantity = borrowedQuantity;
+            device.availableQuantity = device.totalQuantity - borrowedQuantity;
+        }
+
+        return { code: 0, data: { list: devices } };
+    } catch (error) {
+        console.error('获取全部设备失败:', error);
+        return { code: -1, message: '获取设备失败' };
+    }
+}
+
+async function quickCreateDevice(event) {
+    const adminCheck = await checkAdmin(event);
+    if (adminCheck.code !== 0) return adminCheck;
+
+    const { name, categoryId } = event;
+
+    if (!name || !categoryId) {
+        return { code: -1, message: '设备名称和分类不能为空' };
+    }
+
+    try {
+        const result = await db.collection('device_type').add({
+            data: {
+                name,
+                categoryId,
+                totalQuantity: 0,
+                status: 'active',
+                remark: '',
+                createdAt: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        });
+
+        return { code: 0, message: '创建成功', data: { _id: result._id } };
+    } catch (error) {
+        console.error('快速创建设备失败:', error);
+        return { code: -1, message: '创建设备失败' };
+    }
+}
+
+async function deleteCategory(event) {
+    const adminCheck = await checkAdmin(event);
+    if (adminCheck.code !== 0) return adminCheck;
+
+    const { categoryId } = event;
+
+    if (!categoryId) {
+        return { code: -1, message: '分类ID不能为空' };
+    }
+
+    try {
+        const children = await db.collection('category')
+            .where({ parentId: categoryId })
+            .limit(1)
+            .get();
+
+        if (children.data.length > 0) {
+            return { code: -1, message: '该分类下有子分类，无法删除' };
+        }
+
+        const devices = await db.collection('device_type')
+            .where({ categoryId })
+            .limit(1)
+            .get();
+
+        if (devices.data.length > 0) {
+            return { code: -1, message: '该分类下有设备，无法删除' };
+        }
+
+        await db.collection('category').doc(categoryId).remove();
+        return { code: 0, message: '删除成功' };
+    } catch (error) {
+        console.error('删除分类失败:', error);
+        return { code: -1, message: '删除分类失败' };
+    }
+}
+
+async function deleteDevice(event) {
+    const adminCheck = await checkAdmin(event);
+    if (adminCheck.code !== 0) return adminCheck;
+
+    const { deviceId } = event;
+
+    if (!deviceId) {
+        return { code: -1, message: '设备ID不能为空' };
+    }
+
+    try {
+        const borrowResult = await db.collection('borrow_record')
+            .where({
+                deviceTypeId: deviceId,
+                status: _.in(['borrowing', 'partially_returned'])
+            })
+            .limit(1)
+            .get();
+
+        if (borrowResult.data.length > 0) {
+            return { code: -1, message: '该设备有未归还的借用记录，无法删除' };
+        }
+
+        await db.collection('device_type').doc(deviceId).remove();
+        return { code: 0, message: '删除成功' };
+    } catch (error) {
+        console.error('删除设备失败:', error);
+        return { code: -1, message: '删除设备失败' };
+    }
+}
+
+async function createDeviceWithCategory(event) {
+    const adminCheck = await checkAdmin(event);
+    if (adminCheck.code !== 0) return adminCheck;
+
+    const { name, parentId, quantity } = event;
+
+    if (!name || !parentId) {
+        return { code: -1, message: '参数不能为空' };
+    }
+
+    try {
+        const parentCat = await db.collection('category').doc(parentId).get();
+        if (!parentCat.data) {
+            return { code: -1, message: '父分类不存在' };
+        }
+
+        const existingCat = await db.collection('category')
+            .where({ name, parentId })
+            .limit(1)
+            .get();
+
+        let categoryId;
+
+        if (existingCat.data.length > 0) {
+            categoryId = existingCat.data[0]._id;
+        } else {
+            const level = (parentCat.data.level || 0) + 1;
+            if (level > 3) {
+                return { code: -1, message: '最多支持三级分类' };
+            }
+            const catResult = await db.collection('category').add({
+                data: {
+                    name, parentId, level, sort: 0, status: 'active',
+                    createdAt: db.serverDate(), updatedAt: db.serverDate()
+                }
+            });
+            categoryId = catResult._id;
+        }
+
+        const existingDevice = await db.collection('device_type')
+            .where({ categoryId })
+            .limit(1)
+            .get();
+
+        if (existingDevice.data.length === 0) {
+            await db.collection('device_type').add({
+                data: {
+                    name, categoryId,
+                    totalQuantity: quantity || 0, status: 'active', remark: '',
+                    createdAt: db.serverDate(), updatedAt: db.serverDate()
+                }
+            });
+        } else {
+            await db.collection('device_type').doc(existingDevice.data[0]._id).update({
+                data: { totalQuantity: quantity || 0, updatedAt: db.serverDate() }
+            });
+        }
+
+        return { code: 0, message: '设置成功' };
+    } catch (error) {
+        console.error('设置失败:', error);
+        return { code: -1, message: '设置失败' };
+    }
+}
+
+async function deleteDeviceCategory(event) {
+    const adminCheck = await checkAdmin(event);
+    if (adminCheck.code !== 0) return adminCheck;
+
+    const { categoryId, deviceId } = event;
+
+    if (!categoryId) {
+        return { code: -1, message: '分类ID不能为空' };
+    }
+
+    try {
+        if (deviceId) {
+            const borrowResult = await db.collection('borrow_record')
+                .where({
+                    deviceTypeId: deviceId,
+                    status: _.in(['borrowing', 'partially_returned'])
+                })
+                .limit(1)
+                .get();
+
+            if (borrowResult.data.length > 0) {
+                return { code: -1, message: '该设备有未归还的借用记录，无法删除' };
+            }
+
+            await db.collection('device_type').doc(deviceId).remove();
+        }
+
+        await db.collection('category').doc(categoryId).remove();
+        return { code: 0, message: '删除成功' };
+    } catch (error) {
+        console.error('删除设备分类失败:', error);
+        return { code: -1, message: '删除失败' };
+    }
+}
+
+async function createDeviceForCategory(event) {
+    const adminCheck = await checkAdmin(event);
+    if (adminCheck.code !== 0) return adminCheck;
+
+    const { categoryId, quantity } = event;
+
+    if (!categoryId) {
+        return { code: -1, message: '分类ID不能为空' };
+    }
+
+    try {
+        const catResult = await db.collection('category').doc(categoryId).get();
+        if (!catResult.data) {
+            return { code: -1, message: '分类不存在' };
+        }
+
+        const existingDevice = await db.collection('device_type')
+            .where({ categoryId })
+            .limit(1)
+            .get();
+
+        if (existingDevice.data.length > 0) {
+            return { code: -1, message: '该分类已设置数量' };
+        }
+
+        await db.collection('device_type').add({
+            data: {
+                name: catResult.data.name,
+                categoryId,
+                totalQuantity: quantity || 0,
+                status: 'active',
+                remark: '',
+                createdAt: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        });
+
+        return { code: 0, message: '设置成功' };
+    } catch (error) {
+        console.error('设置数量失败:', error);
+        return { code: -1, message: '设置失败' };
     }
 }

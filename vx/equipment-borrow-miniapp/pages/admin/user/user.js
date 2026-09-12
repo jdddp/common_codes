@@ -92,7 +92,7 @@ Page({
     onEditUser(e) {
         const user = e.currentTarget.dataset.user;
         wx.navigateTo({
-            url: `/pages/admin/user/edit?id=${user._id}&name=${user.name}&phone=${user.phone}&department=${user.department || ''}&role=${user.role}`
+            url: `/pages/admin/user/edit?id=${user._id}&name=${encodeURIComponent(user.name)}&phone=${user.phone}&department=${encodeURIComponent(user.department || '')}&role=${user.role}`
         });
     },
 

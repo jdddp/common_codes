@@ -4,22 +4,21 @@ const util = require('../../utils/util');
 Page({
     data: {
         borrowings: [],
-        currentTab: '',
+        currentTab: 'borrowing',
         loading: false,
         page: 1,
         pageSize: 20,
         hasMore: true
     },
 
-    onLoad() {
-        this.loadBorrowings();
-    },
+    onLoad() {},
 
     onShow() {
         this.setData({
             page: 1,
             hasMore: true,
-            borrowings: []
+            borrowings: [],
+            loading: false
         });
         this.loadBorrowings();
     },
@@ -28,7 +27,8 @@ Page({
         this.setData({
             page: 1,
             hasMore: true,
-            borrowings: []
+            borrowings: [],
+            loading: false
         });
         this.loadBorrowings();
         wx.stopPullDownRefresh();
@@ -83,9 +83,8 @@ Page({
     getStatusText(status) {
         const statusMap = {
             'borrowing': '借用中',
-            'partially_returned': '部分归还',
-            'returned': '已归还',
-            'cancelled': '已取消'
+            'partially_returned': '借用中',
+            'returned': '已归还'
         };
         return statusMap[status] || status;
     },
@@ -101,7 +100,8 @@ Page({
             currentTab: tab,
             page: 1,
             hasMore: true,
-            borrowings: []
+            borrowings: [],
+            loading: false
         });
         this.loadBorrowings();
     },
@@ -109,7 +109,7 @@ Page({
     onReturnTap(e) {
         const borrow = e.currentTarget.dataset.borrow;
         wx.navigateTo({
-            url: `/pages/return/return?borrowRecordId=${borrow._id}&deviceName=${borrow.deviceName}&quantity=${borrow.quantity}&returnedQuantity=${borrow.returnedQuantity}`
+            url: `/pages/return/return?borrowRecordId=${borrow._id}&deviceName=${encodeURIComponent(borrow.deviceName || '')}&quantity=${borrow.quantity}&returnedQuantity=${borrow.returnedQuantity}`
         });
     }
 });

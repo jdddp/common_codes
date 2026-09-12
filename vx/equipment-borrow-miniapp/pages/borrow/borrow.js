@@ -17,7 +17,7 @@ Page({
         const today = util.formatDate(new Date());
         this.setData({
             deviceId: options.deviceId || '',
-            deviceName: options.deviceName || '',
+            deviceName: decodeURIComponent(options.deviceName || ''),
             availableQuantity: parseInt(options.availableQuantity) || 0,
             today
         });

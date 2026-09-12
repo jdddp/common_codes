@@ -7,7 +7,7 @@ cloud.init({
 });
 
 const db = cloud.database();
-const JWT_SECRET = 'your-jwt-secret-key';
+const JWT_SECRET = 'A2CF692946145E42362A1BA63DAAC972457CC0CC6ED9B7D7FCD2FB250F33B7F7';
 
 exports.main = async (event, context) => {
     const { action } = event;
@@ -17,11 +17,11 @@ exports.main = async (event, context) => {
         case 'login':
             return await login(event, wxContext);
         case 'getCurrentUser':
-            return await getCurrentUser(wxContext);
+            return await getCurrentUser(event);
         case 'logout':
             return await logout(wxContext);
         case 'changePassword':
-            return await changePassword(event, wxContext);
+            return await changePassword(event);
         default:
             return { code: -1, message: '未知操作' };
     }
@@ -88,9 +88,9 @@ async function login(event, wxContext) {
     }
 }
 
-async function getCurrentUser(wxContext) {
+async function getCurrentUser(event) {
     try {
-        const token = wxContext.token || wxContext.TOKEN;
+        const token = event.token;
         if (!token) {
             return { code: -1, message: '未登录' };
         }
@@ -136,8 +136,8 @@ async function logout(wxContext) {
     return { code: 0, message: '登出成功' };
 }
 
-async function changePassword(event, wxContext) {
-    const { oldPassword, newPassword } = event;
+async function changePassword(event) {
+    const { oldPassword, newPassword, token } = event;
 
     if (!oldPassword || !newPassword) {
         return { code: -1, message: '旧密码和新密码不能为空' };
@@ -148,7 +148,6 @@ async function changePassword(event, wxContext) {
     }
 
     try {
-        const token = wxContext.token || wxContext.TOKEN;
         if (!token) {
             return { code: -1, message: '未登录' };
         }

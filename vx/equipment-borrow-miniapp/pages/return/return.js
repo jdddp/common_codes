@@ -25,7 +25,7 @@ Page({
 
         this.setData({
             borrowRecordId: options.borrowRecordId || '',
-            deviceName: options.deviceName || '',
+            deviceName: decodeURIComponent(options.deviceName || ''),
             quantity,
             returnedQuantity,
             outstandingQuantity

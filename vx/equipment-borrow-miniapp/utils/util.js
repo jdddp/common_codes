@@ -1,3 +1,5 @@
+const auth = require('./auth');
+
 const util = {
     formatTime(date) {
         if (!date) return '';
@@ -56,9 +58,10 @@ const util = {
 
     async callCloudFunction(name, data) {
         try {
+            const token = auth.getToken();
             const result = await wx.cloud.callFunction({
                 name,
-                data
+                data: { ...data, token }
             });
             return result.result;
         } catch (error) {

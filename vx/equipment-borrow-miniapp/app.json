@@ -7,8 +7,11 @@
         "pages/my-borrow/my-borrow",
         "pages/records/records",
         "pages/password/password",
+        "pages/return/return",
         "pages/admin/device/device",
+        "pages/admin/device/edit",
         "pages/admin/user/user",
+        "pages/admin/user/edit",
         "pages/admin/record/record"
     ],
     "window": {

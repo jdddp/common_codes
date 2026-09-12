@@ -19,14 +19,14 @@ exports.main = async (event, context) => {
     }
 };
 
-async function getCurrentUser(wxContext) {
-    const token = wxContext.token || wxContext.TOKEN;
+async function getCurrentUser(event) {
+    const token = event.token;
     if (!token) {
         return { code: -1, message: '未登录' };
     }
 
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, 'your-jwt-secret-key');
+    const decoded = jwt.verify(token, 'A2CF692946145E42362A1BA63DAAC972457CC0CC6ED9B7D7FCD2FB250F33B7F7');
 
     const userResult = await db.collection('user').doc(decoded.userId).get();
     if (!userResult.data) {
@@ -57,7 +57,7 @@ async function returnDevice(event, wxContext) {
         return { code: -1, message: '归还数量必须大于0' };
     }
 
-    const userCheck = await getCurrentUser(wxContext);
+    const userCheck = await getCurrentUser(event);
     if (userCheck.code !== 0) return userCheck;
 
     const user = userCheck.user;

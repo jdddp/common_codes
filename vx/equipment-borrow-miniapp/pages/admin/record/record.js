@@ -6,9 +6,7 @@ Page({
         records: [],
         statusIndex: 0,
         statusOptions: [
-            { label: '全部状态', value: '' },
             { label: '借用中', value: 'borrowing' },
-            { label: '部分归还', value: 'partially_returned' },
             { label: '已归还', value: 'returned' }
         ],
         startDate: '',
@@ -19,20 +17,15 @@ Page({
         hasMore: true
     },
 
-    onLoad() {
-        if (!auth.checkAdmin()) {
-            return;
-        }
-        this.loadRecords();
+    onLoad() {},
+
+    onShow() {
+        if (!auth.checkAdmin()) return;
+        this.resetAndLoad();
     },
 
     onPullDownRefresh() {
-        this.setData({
-            page: 1,
-            hasMore: true,
-            records: []
-        });
-        this.loadRecords();
+        this.resetAndLoad();
         wx.stopPullDownRefresh();
     },
 
@@ -40,6 +33,16 @@ Page({
         if (this.data.hasMore && !this.data.loading) {
             this.loadMore();
         }
+    },
+
+    resetAndLoad() {
+        this.setData({
+            page: 1,
+            hasMore: true,
+            records: [],
+            loading: false
+        });
+        this.loadRecords();
     },
 
     async loadRecords() {
@@ -51,8 +54,8 @@ Page({
             const result = await util.callCloudFunction('record', {
                 action: 'listAllRecords',
                 status: this.data.statusOptions[this.data.statusIndex].value,
-                startDate: this.data.startDate || '',
-                endDate: this.data.endDate || '',
+                startDate: this.data.startDate,
+                endDate: this.data.endDate,
                 page: this.data.page,
                 pageSize: this.data.pageSize
             });
@@ -84,9 +87,8 @@ Page({
     getStatusText(status) {
         const statusMap = {
             'borrowing': '借用中',
-            'partially_returned': '部分归还',
-            'returned': '已归还',
-            'cancelled': '已取消'
+            'partially_returned': '借用中',
+            'returned': '已归还'
         };
         return statusMap[status] || status;
     },
@@ -97,32 +99,17 @@ Page({
     },
 
     onStatusChange(e) {
-        this.setData({
-            statusIndex: e.detail.value,
-            page: 1,
-            hasMore: true,
-            records: []
-        });
-        this.loadRecords();
+        this.setData({ statusIndex: e.detail.value });
+        this.resetAndLoad();
     },
 
     onStartDateChange(e) {
-        this.setData({
-            startDate: e.detail.value,
-            page: 1,
-            hasMore: true,
-            records: []
-        });
-        this.loadRecords();
+        this.setData({ startDate: e.detail.value });
+        this.resetAndLoad();
     },
 
     onEndDateChange(e) {
-        this.setData({
-            endDate: e.detail.value,
-            page: 1,
-            hasMore: true,
-            records: []
-        });
-        this.loadRecords();
+        this.setData({ endDate: e.detail.value });
+        this.resetAndLoad();
     }
 });
