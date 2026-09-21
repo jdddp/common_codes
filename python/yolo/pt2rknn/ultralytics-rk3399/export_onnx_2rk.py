@@ -1,6 +1,6 @@
 
 from ultralytics import YOLO
-model = YOLO("/home/poly/jzp/common_codes/python/yolo/pt2rknn/ultralytics-rk3399/20260803cy_logo.pt")
+model = YOLO("/home/poly/jzp/ultralytics/weights/cy/20260921_v4/weights/20260921_v4.pt")
 
 '''
 ./ultralytics/engine/model.py

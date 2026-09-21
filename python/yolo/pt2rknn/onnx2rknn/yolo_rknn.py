@@ -252,19 +252,21 @@ if __name__ == '__main__':
     # Default paths
     # ONNX_PATH = './ultralytics-rk3399/v37_logo.onnx'
     # RKNN_PATH = './ultralytics-rk3399/rknn_use3588.rknn'
-    ONNX_PATH = './ultralytics-rk3399/20260803cy_logo.onnx'
-    RKNN_PATH = './ultralytics-rk3399/20260803cy_logo.rknn'
+    ONNX_PATH = '../ultralytics-rk3399/cy_v4.onnx'
+    RKNN_PATH = '../ultralytics-rk3399/cy_v4.rknn'
 
 
-    DATASET_PATH = './onnx2rknn/imagelist_cy.txt'
+    DATASET_PATH = './imagelist_cy.txt'
     # IMG_PATH = './onnx2rknn/src_quant_dataset'
-    IMG_PATH = './onnx2rknn/cy'
+    IMG_PATH = './rknn_quantitation'
 
     OUTPUT_IMAGE_PATH = './test/rknn_infer'
     os.makedirs(OUTPUT_IMAGE_PATH, exist_ok=True)
     TARGET_PLATFORM = 'rk3588'
     INPUT_SIZE = (640, 640)
-    CLASSES = ['fish2', 'yq', 'zl','hdy']
+    # CLASSES = ['fish2', 'yq', 'zl','hdy']
+    CLASSES = ['fish2','hdy']
+
     # CLASSES = ['sl', 'slb']
 
     

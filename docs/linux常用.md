@@ -11,4 +11,10 @@
    #temp
    sudo ip addr add 192.168.53.101/24 dev eth0
    sudo ip link set eth0 up
+
+   #always
+   nmcli connection show
+   sudo nmcli connection modify "有线连接 1"     ipv4.method manual     ipv4.addresses 192.168.53.101/24
+   sudo nmcli connection down "有线连接 1"
+   sudo nmcli connection up "有线连接 1"
    ~~~
