@@ -96,15 +96,13 @@ private:
     // 与模型训练类别顺序一致的标签表。
     const std::vector<std::string> labels_ = {
         "cy",
-        "zl",
-        "yq"
+        "hdy"
     };
 
     // 第二阶段按类别单独设置的阈值，用于进一步收紧结果。
     const std::vector<float> class_thres_ = {
         0.2f,  // cy
-        1.0f,  // zl
-        1.0f   // yq
+        0.95f,  // hdy
     };
 };
 
