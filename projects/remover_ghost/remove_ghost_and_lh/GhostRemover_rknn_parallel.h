@@ -58,7 +58,7 @@ private:
     // 3. 丢失超过 lost_frames 后直接删除该轨迹。
     float track_wh_ratio_ = 5.0f;
     int track_confirm_frames_ = 1;
-    int track_lost_frames_ = 2;
+    int track_lost_frames_ = 3;
 
     // 保存最近一帧输出给上层的框信息，便于调试显示来源。
     std::vector<CyBoxInfo> last_cy_boxes_;
@@ -111,8 +111,8 @@ public:
     // 执行整条去除流程。
     cv::Mat removeGhosts(const cv::Mat& input_img,
                         float conf_threshold_self = 0.2f,
-                        int mirror_thre = 2,
-                        float mirror_ratio_thre = 0.f,
+                        int mirror_thre = 1,
+                        float mirror_ratio_thre = 1.8f,
                         bool enable_lh_postprocess = true,
                         bool enable_ghost_postprocess = true);
 

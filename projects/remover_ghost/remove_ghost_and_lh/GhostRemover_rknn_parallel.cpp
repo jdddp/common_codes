@@ -1,4 +1,4 @@
-#include "GhostRemover_rknn.h"
+#include "GhostRemover_rknn_parallel.h"
 
 #include <QDebug>
 #include <QElapsedTimer>
@@ -706,6 +706,40 @@ void GhostRemover::applyGhostDetections(cv::Mat& result_img,
             }
             patch.data.copyTo(result_img(patch.roi));
         }
+    }
+
+    // hdy 不做跨帧追踪，当前帧检测到后直接在结果图上标注出来。
+    for (const auto& obj : objects) {
+        if (obj.label != "hdy" || obj.prob < 0.1f) {
+            continue;
+        }
+
+        const cv::Rect2f clipped_box = clipRectToImage(obj.rect, image_rect);
+        if (clipped_box.width <= 0.f || clipped_box.height <= 0.f) {
+            continue;
+        }
+
+        cv::Rect expanded_box(
+            cvRound(clipped_box.x),
+            cvRound(clipped_box.y),
+            cvRound(clipped_box.width),
+            cvRound(clipped_box.height));
+        expanded_box.x -= 4;
+        expanded_box.y -= 4;
+        expanded_box.width += 8;
+        expanded_box.height += 8;
+
+        const cv::Scalar color(0, 0, 255);
+        const std::string label = "HDY";
+        cv::rectangle(result_img, expanded_box, color, 2);
+        cv::putText(result_img,
+                    label,
+                    cv::Point(expanded_box.x,
+                              std::max(12, expanded_box.y - 4)),
+                    cv::FONT_HERSHEY_SIMPLEX,
+                    10,
+                    color,
+                    2);
     }
 }
 

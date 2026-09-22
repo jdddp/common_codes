@@ -14,7 +14,7 @@
       "name": "科大讯飞",
       "quantity": 200,
       "cost_price": 39.069,
-      "current_price": 39.07,
+      "current_price": 39.14,
       "sector": null,
       "notes": null
     },
@@ -23,12 +23,12 @@
       "name": "桂冠电力",
       "quantity": 300,
       "cost_price": 9.76,
-      "current_price": 9.42,
+      "current_price": 9.41,
       "sector": null,
       "notes": null
     }
   ],
   "total_assets": 33748.52,
   "available_funds": 0.0,
-  "updated_at": "2026-09-22T13:44:06.879924"
+  "updated_at": "2026-09-22T14:26:09.361682"
 }
