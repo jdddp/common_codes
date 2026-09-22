@@ -2,10 +2,10 @@
   "host": "127.0.0.1",
   "port": 8000,
   "ai": {
-    "provider": "qwen",
+    "provider": "deepseek",
     "api_key": "sk-ws-H.PDYYLXM.WXsq.MEYCIQDZSbntFO9azyBUWX-TFpk5Bx6EOg28FwewexFa75SrvAIhAJYBsObWtgqbM7V_kBLOSXaFJc8kZX_UeuYn_w_ODiwJ",
     "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "model": "qwen3.8-max",
+    "model": "deepseek-v4-pro-0813",
     "max_tokens": 4096,
     "temperature": 0.7,
     "enable_web_search": true,
