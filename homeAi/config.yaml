@@ -10,7 +10,7 @@ camera:
   camera_id: "main"
   # 信号源: 本地视频文件会用循环模拟 IP 摄像头(见 tools/gen_test_video.py);
   # 真实摄像头请改成 RTSP 地址, 例如 rtsp://user:password@192.168.1.100:554/stream1
-  rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
+  rtsp_url: "data/aa632867bcb79c54194e0cb63d43d882.mp4"
   # 断开后重连间隔(秒), 随失败次数指数退避到 max_reconnect_delay
   reconnect_delay: 2
   max_reconnect_delay: 30
