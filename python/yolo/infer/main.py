@@ -6,27 +6,15 @@ from tqdm import tqdm
 import time
 def yolo26():
     cfg_path = './yolo26onnx.yml'
-    model = YOLO26ONNX("CY26", cfg_path)
-    src_dir = r'E:\cy_yudu'
-    dst_dir = r'E:\cy_yudu-filter'
-    os.makedirs(dst_dir, exist_ok=True)
-    num = 0
-    for dirname in os.listdir(src_dir):
-        dir_path = osp.join(src_dir, dirname)
-        if not osp.isdir(dir_path):
-            continue
-        for imgname in tqdm(os.listdir(dir_path)):
-            if not imgname.endswith('.png'):
-                continue
-            img = cv2.imread(osp.join(dir_path, imgname))
-            _,detections = model.infer(img, False)
-            # print(detections)
-            # for det in detections:
-            #     if det['category'] =='cy_special':
-            #         shutil.copy(osp.join(dir_path, imgname), dst_dir)
-            #         num+=1
-            #         break
-    print(f"num: {num}")
+    model = YOLO26ONNX("Home", cfg_path)
+    imgpath = '/home/poly/Desktop/cat/微信图片_20260922172406_24_60.jpg'
+    img = cv2.imread(imgpath)
+    cv2.imshow("img",img)
+    cv2.waitKey(0)
+    _,detections = model.infer(img, False)
+    # print(detections)
+    for det in detections:
+        print(det)
 
 
 

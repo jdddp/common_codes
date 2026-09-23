@@ -1,0 +1,83 @@
+# 家庭 AI 摄像头系统配置
+# RTSP 地址示例: rtsp://user:password@192.168.1.100:554/stream1
+
+server:
+  host: 0.0.0.0
+  port: 8765
+
+camera:
+  # 摄像头标识(为多摄像头预留)
+  camera_id: "main"
+  # 信号源: 本地视频文件会用循环模拟 IP 摄像头(见 tools/gen_test_video.py);
+  # 真实摄像头请改成 RTSP 地址, 例如 rtsp://user:password@192.168.1.100:554/stream1
+  rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
+  # 断开后重连间隔(秒), 随失败次数指数退避到 max_reconnect_delay
+  reconnect_delay: 2
+  max_reconnect_delay: 30
+  # 多久没收到新帧判定为卡死/断流(秒)
+  watchdog_timeout: 10
+
+pipeline:
+  # 传给插件的帧间隔控制(帧率上限), 0 表示不限制
+  max_fps: 20
+  # 缩放后再交给插件 (1 表示原图)
+  scale: 0.5
+
+storage:
+  snapshot_dir: "data/snapshots"
+  clips_dir: "data/clips"
+  db_path: "data/homeai.db"
+  # 保留多少天的记录/快照/录像
+  retain_days: 14
+
+clips:
+  # 事件前环形缓冲时长(秒)
+  buffer_sec: 15
+  # 录像帧率
+  fps: 12
+  # 录像分辨率缩放
+  scale: 0.5
+
+plugins:
+  - name: person_intrusion
+    enabled: true
+    config:
+      # 每多少帧检测一次
+      every_n_frames: 5
+      # 检测区域 ROI [x, y, w, h], 范围 0~1, 留空表示全图
+      roi: []
+      # 触发后多少秒内不再触发(防抖/冷却)
+      debounce_sec: 10
+      # 运动事件是否保存快照
+      save_snapshot: true
+      # 运动事件是否保存前后时间段录像
+      record_video: true
+      # 事件前保留秒数(来自 clips.buffer_sec 覆盖, 不能超过 buffer_sec)
+      pre_sec: 5
+      # 事件后继续录制秒数
+      post_sec: 8
+      #model args
+      device: "cpu"                    # or "gpu"
+      weightPath: "./backend/plugins/yolo26n.onnx" #"./models/cy_v20713.onnx"
+      img_size: 640                     # 输入图像尺寸
+      conf_threshold: 0.1              # 检测置信度阈值
+      classes: ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush']
+      conf_list: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+      visible_classes: ["person"] #["cy", "yq", "zl", 'yq2']  # 只显示这些类别
+      #track
+      #最右侧 20% 作为“进入区域”
+      entry_zone_ratio: 0.2
+      # 至少向左移动 20 像素才认为真正进入
+      min_move_px: 20
+
+      # 目标最多允许丢失 15 帧
+      max_track_age: 3
+
+      # IoU 跟踪阈值
+      track_iou_threshold: 0.20
+
+      # 中心点最大匹配距离
+      track_distance_ratio: 0.12
+
+      # 全局报警冷却
+      debounce_sec: 10

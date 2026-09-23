@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home AI - 家庭监控</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Home AI</h1>
+    <div class="status-strip">
+      <span class="pill" id="net-status" data-status="connecting">连接中...</span>
+      <span class="pill" id="cam-status">摄像头: -</span>
+      <span class="pill" id="cam-fps">FPS: -</span>
+      <span class="pill" id="ws-status">WS: -</span>
+      <span class="plugs" id="plugin-bar"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel live-panel">
+      <h2>实时画面 <button id="live-toggle" class="btn-mini" type="button">暂停</button></h2>
+      <div class="video-wrap">
+        <img id="live" src="/cam/stream" alt="实时画面">
+        <div id="live-paused" class="live-paused hidden">实时画面已暂停</div>
+      </div>
+    </section>
+
+    <section class="panel records-panel">
+      <h2>事件记录
+        <span class="hint" id="last-sync"></span>
+      </h2>
+      <div id="day-bar" class="day-bar"></div>
+      <div id="record-list" class="record-list"></div>
+    </section>
+  </main>
+
+  <template id="tpl-record">
+    <article class="record" data-kind="">
+      <div class="media">
+        <a class="thumb-link" target="_blank">
+          <img class="thumb" alt="快照">
+        </a>
+        <video class="clip" controls preload="none"></video>
+      </div>
+      <div class="meta">
+        <div class="row1">
+          <span class="kind-badge"></span>
+          <span class="time"></span>
+          <button class="rec-del" type="button" title="删除记录">×</button>
+        </div>
+        <div class="summary"></div>
+      </div>
+    </article>
+  </template>
+
+  <div id="lightbox" class="lightbox hidden">
+    <div class="lb-content">
+      <span class="lb-close">&times;</span>
+      <img id="lb-img" src="" alt="大图">
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
