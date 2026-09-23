@@ -7,9 +7,15 @@ const STATE = {
   reconnectDelay: 3000,
   livePaused: false,
   day: "", // "" = 全部, 否则为 "YYYY-MM-DD"
+  cameras: [], // [{camera_id, status, fps, frame_id}]
+  active: null, // 当前实时画面摄像头 id
 };
 
 const $ = (sel) => document.querySelector(sel);
+
+function camStreamUrl() {
+  return STATE.active ? `/cam/${STATE.active}/stream` : "/cam/stream";
+}
 
 // ---------- 渲染记录 ----------
 const TEMPLATE = document.getElementById("tpl-record").content;
@@ -70,7 +76,8 @@ function buildRecord(ev) {
   frag.querySelector(".rec-del").dataset.id = ev.id;
 
   const src = ev.source ? ` · <span class="src">${ev.source}</span>` : "";
-  frag.querySelector(".summary").innerHTML = (ev.summary || "") + src;
+  const cam = ev.camera_id ? ` · <span class="src">${ev.camera_id}</span>` : "";
+  frag.querySelector(".summary").innerHTML = (ev.summary || "") + src + cam;
 
   const thumb = frag.querySelector(".thumb");
   const link = frag.querySelector(".thumb-link");
@@ -243,23 +250,59 @@ async function sync() {
   await fetchEvents(STATE.lastId);
 }
 
-// ---------- 状态栏 ----------
+// ---------- 状态栏 + 摄像头切换 ----------
 async function fetchStatus() {
   try {
     const res = await fetch("/api/status");
     if (!res.ok) return;
     const s = await res.json();
 
+    if (!s.cameras || !s.cameras.length) return;
+    STATE.cameras = s.cameras;
+    if (STATE.active === null || !s.cameras.find((c) => c.camera_id === STATE.active)) {
+      STATE.active = s.cameras[0].camera_id;
+      // 若已暂停则保持暂停状态; 否则刷新到当前画面的摄像头
+      if (!STATE.livePaused) $("#live").src = camStreamUrl();
+    }
+
+    const active = s.cameras.find((c) => c.camera_id === STATE.active);
     const cam = $("#cam-status");
-    cam.dataset.status = s.camera.status;
-    cam.textContent = `摄像头: ${s.camera.status}`;
-    $("#cam-fps").textContent = `FPS: ${s.camera.fps}`;
+    cam.dataset.status = active ? active.status : "stopped";
+    cam.textContent = active ? `摄像头: ${active.camera_id} · ${active.status}` : "摄像头: -";
+    $("#cam-fps").textContent = `FPS: ${active ? active.fps : "-"}`;
     updateSync(`WS:${s.ws_clients}`);
 
+    renderCamBar();
     renderPlugins(s.plugins);
   } catch (err) {
     console.error("fetch status failed:", err);
   }
+}
+
+function renderCamBar() {
+  const bar = $("#cam-bar");
+  bar.innerHTML = "";
+  for (const c of STATE.cameras) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "cam-chip" + (STATE.active === c.camera_id ? " active" : "");
+    b.dataset.status = c.status;
+    b.innerHTML = `<span class="dot"></span>${c.camera_id}`;
+    b.title = `${c.camera_id} · ${c.status} · FPS ${c.fps}`;
+    b.addEventListener("click", () => switchCamera(c.camera_id));
+    bar.appendChild(b);
+  }
+}
+
+function switchCamera(id) {
+  if (STATE.active === id) return;
+  STATE.active = id;
+  if (!STATE.livePaused) {
+    $("#live").src = camStreamUrl(); // 更换 MJPEG 源
+    $("#live-paused").classList.add("hidden");
+  }
+  renderCamBar();
+  fetchStatus();
 }
 
 function renderPlugins(plugins) {
@@ -268,10 +311,11 @@ function renderPlugins(plugins) {
   for (const p of plugins) {
     const pill = document.createElement("span");
     pill.className = "plug-pill" + (p.enabled ? " on" : "");
-    pill.innerHTML = `<span class="dot"></span>${p.name}`;
-    pill.title = p.last_error || "";
+    pill.innerHTML = `<span class="dot"></span>${p.camera_id}.${p.name}`;
+    pill.title = `${p.camera_id}.${p.name} · ${p.last_error || ""}`;
     pill.addEventListener("click", async () => {
-      const res = await fetch(`/api/plugins/${p.name}/toggle`, { method: "POST" });
+      if (!p.camera_id) return;
+      const res = await fetch(`/api/cameras/${p.camera_id}/plugins/${p.name}/toggle`, { method: "POST" });
       if (res.ok) fetchStatus();
     });
     bar.appendChild(pill);
@@ -328,7 +372,7 @@ function toggleLive() {
     btn.textContent = "继续";
     mask.classList.remove("hidden");
   } else {
-    $("#live").src = "/cam/stream";
+    $("#live").src = camStreamUrl();
     btn.textContent = "暂停";
     mask.classList.add("hidden");
   }

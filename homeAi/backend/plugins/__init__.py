@@ -1,4 +1,4 @@
-"""插件加载与调度: 按 config 顺序加载插件, 节流调用 on_frame(由 Pipeline 分发)。"""
+"""插件加载与调度: 按每路摄像头的 plugins 配置加载插件, 节流调用 on_frame(由 Pipeline 分发)。"""
 import importlib
 import logging
 from typing import Any, Dict, List
@@ -13,26 +13,27 @@ log = logging.getLogger(__name__)
 
 
 class PluginManager:
-    def __init__(self, config: Config, bus: EventBus):
-        self._config = config
+    def __init__(self, specs: List[Dict], bus: EventBus, camera_id: str = "main"):
+        """specs: 该摄像头下的插件配置列表(来自 cameras[i].plugins)。"""
+        self._specs = specs
         self._bus = bus
+        self._camera_id = camera_id
         self.plugins: List[BasePlugin] = []
         self._counters: Dict[int, int] = {}
         self._last_error_log: Dict[int, int] = {}
 
     def load_all(self) -> None:
-        specs = self._config.section("plugins") or []
-        for spec in specs:
+        for spec in self._specs:
             pname = spec.get("name")
             if not spec.get("enabled", True):
                 continue
             plugin_cls = self._resolve_class(pname)
             if plugin_cls is None:
                 continue
-            plugin = plugin_cls(spec.get("config", {}) or {}, self._bus)
+            plugin = plugin_cls(spec.get("config", {}) or {}, self._bus, camera_id=self._camera_id)
             plugin.on_start()
             self.plugins.append(plugin)
-            log.info("loaded plugin: %s", pname)
+            log.info("loaded plugin [%s]: %s", self._camera_id, pname)
 
     def shutdown(self) -> None:
         for p in self.plugins:

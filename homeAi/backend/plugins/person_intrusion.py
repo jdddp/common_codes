@@ -53,8 +53,8 @@ class PersonIntrusionPlugin(BasePlugin):
 
     name = "person_intrusion"
 
-    def __init__(self, config, bus):
-        super().__init__(config, bus)
+    def __init__(self, config, bus, camera_id="main"):
+        super().__init__(config, bus, camera_id=camera_id)
 
         self.device = str(config.get("device", "cpu"))
         self.weight_path = str(config.get("weightPath", ""))

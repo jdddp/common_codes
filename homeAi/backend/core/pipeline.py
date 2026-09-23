@@ -1,13 +1,11 @@
-"""帧管线: 唯一帧分发者。统一控制缩放与派发, 插件不接触 CameraSource。"""
+"""帧管线: 唯一帧分发者。每路摄像头一个实例, 控制缩放与派发, 插件不接触 CameraSource。"""
 import cv2
 import numpy as np
 
-from ..config import Config
-
 
 class Pipeline:
-    def __init__(self, config: Config, plugin_manager, recorder):
-        self._scale = float(config.get("pipeline", "scale", 1.0))
+    def __init__(self, scale: float, plugin_manager, recorder):
+        self._scale = float(scale or 1.0)
         self._pm = plugin_manager
         self._recorder = recorder
 

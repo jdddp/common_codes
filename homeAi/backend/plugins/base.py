@@ -22,9 +22,10 @@ log = logging.getLogger(__name__)
 class BasePlugin:
     name: str = "base"
 
-    def __init__(self, config: Dict[str, Any], bus: EventBus):
+    def __init__(self, config: Dict[str, Any], bus: EventBus, camera_id: str = "main"):
         self.config = config
         self.bus = bus
+        self.camera_id = camera_id
         self.frame_count = 0
         self._enabled = True
         self.last_error: Optional[str] = None
@@ -44,6 +45,7 @@ class BasePlugin:
 
     # ---- 工具 ----
     def emit(self, kind: str, **payload: Any) -> Dict[str, Any]:
+        payload.setdefault("camera_id", self.camera_id)
         return self.bus.publish(kind, **payload)
 
     def emit_alert(self, summary: str, **payload: Any) -> Dict[str, Any]:
@@ -59,4 +61,9 @@ class BasePlugin:
         return self._enabled
 
     def info(self) -> Dict[str, Any]:
-        return {"name": self.name, "enabled": self._enabled, "last_error": self.last_error}
+        return {
+            "name": self.name,
+            "camera_id": self.camera_id,
+            "enabled": self._enabled,
+            "last_error": self.last_error,
+        }

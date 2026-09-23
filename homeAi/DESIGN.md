@@ -75,10 +75,11 @@ homeAi/
 │   ├── main.py              # FastAPI 入口、生命周期
 │   ├── storage.py           # 记录形成模块：唯一写记录权限
 │   ├── core/
-│   │   ├── stream.py        # 采集线程：自动重连/指数退避/看门狗
-│   │   ├── recorder.py      # 帧录像器：环形缓冲+事件前后剪辑(mp4)
+│   │   ├── cameras.py       # 多摄像头管理：每路一个完整单元
+│   │   ├── stream.py        # 采集线程：自动重连/指数退避/看门狗/本地循环
+│   │   ├── recorder.py      # 帧录像器：每路独立环形缓冲+事件前后剪辑(mp4)
 │   │   ├── events.py        # EventBus(内部) + WsHub(WS 管理/广播)
-│   │   └── pipeline.py      # 帧管线：唯一帧分发者(缩放/节流)
+│   │   └── pipeline.py      # 帧管线：唯一帧分发者(缩放/节流), 每路一个
 │   └── plugins/
 │       ├── base.py          # BasePlugin 基类
 │       ├── person_intrusion.py  # 人员入侵检测(ONNX YOLO, 事件段内只落一条记录)
@@ -151,7 +152,7 @@ class BasePlugin:
 - 订阅 `record_clip`（含 `pre_sec/post_sec` 元数据）→ 用前后帧合成 MP4 存 `data/clips/YYYYMMDD/xxx.mp4`；首帧生成 JPEG 缩略图
 - 异步任务：录制满 `post_sec` 后产出 → 发 `clip` 给 Storage 落库 → `record_created` 广播
 - **`record_clip` 不是最终记录**；真正入库类型是 `clip`（代码层严格保持）
-- 编码策略：优先 H.264(avc1) → 失败回退 mp4v → 前端播不了则提供下载
+- 编码策略: 优先系统 ffmpeg → H.264 Constrained Baseline(yuv420p+faststart, 浏览器 `<video>` 原生可播); ffmpeg 缺失时回退 OpenCV(avc1 → mp4v), 此时浏览器可能播不了但可下载
 - 体积：`clip_fps / clip_scale` 可配置
 
 **录像实现说明（第一版接受开销，以后优化不返工）**：
@@ -160,6 +161,14 @@ class BasePlugin:
 v1:  RTSP/H264 → OpenCV解码 → BGR → JPEG → 内存 → 解JPEG → VideoWriter → MP4   （CPU 较高，够用）
 未来: FFmpeg H264 packet ring buffer → 直接 remux/clip → MP4                    （不重编码，CPU 极低）
 ```
+
+### 4.7 多摄像头（cameras.py）
+- 每路摄像头 = `CameraUnit`：独立 `CameraSource + Pipeline + PluginManager + FrameRecorder`
+- 配置：`cameras:` 列表（`camera_id`/`rtsp_url`/重连参数/`plugins`）；兼容旧单摄像头写法（无 `cameras` 时从顶层 `camera`+`plugins` 派生一路）
+- 事件统一走共享 EventBus，全部带 `camera_id`（plugin.emit 自动注入）；Storage 落库 + 级联删除按 `camera_id` 隔离，两路互不干扰
+- 录像器每路一个环形缓冲，`record_clip` 事件按 `camera_id` 归属
+- 插件按摄像头实例化（独立跟踪/报警状态）；启停走 `/api/cameras/{id}/plugins/{name}/toggle`
+- 前端：摄像头切换条 + `/cam/{camera_id}/stream` MJPEG；`/api/status` 返回 `cameras` 列表
 
 ## 5. 事件流
 
@@ -246,9 +255,8 @@ plugins:
 ## 8. 扩展路线
 
 | 功能 | 做法 |
-|---|---|---|
-| 运动检测 | 独立插件(参考 person_intrusion 状态机)，阈值判定帧间差异 |
-| 多摄像头 | 每路一个 CameraSource+Pipeline；events 表已带 camera_id，DB 免改 |
+|---|---|
+| 独立播放器 | 支持单画面/多画面分屏（前端 grids），后端已按 camera_id 提供独立流 |
 | 录像低 CPU | 升级 FFmpeg H264 packet ring + remux（不重编码），替换 FrameRecorder 内部实现 |
 | PTZ / 实时调参 | 复用 WS 通道承载双向指令 |
 | 前端框架化 | 记录/状态均走 REST，界面可迁 Vue/React |
@@ -281,3 +289,5 @@ plugins:
 | 5 | 级联删除 | `DELETE /api/events/{id}` → 同 `source` + `ts±1s` 归组删除 + 清理媒体文件 + 逐条 `record_deleted` 广播 |
 | 6 | 录像下载 | clip 卡片下载按钮（`<a download>`, 同源） |
 | 7 | 信号扩展 | WS 信号含 `record_created` / `record_deleted`，前端/重连均同步 |
+| 8 | 多摄像头 | `cameras:` 列表配置，每路独立取流/插件/录像缓冲；`/cam/{id}/stream` + 前端切换条；插件跨摄像头独立启停 |
+| 9 | 浏览器可播录像 | OpenCV 只能产 MPEG-4 Part 2(浏览器播不了) → 改用系统 ffmpeg 编 H.264 Baseline(yuv420p+faststart)，缺失时回退 OpenCV |

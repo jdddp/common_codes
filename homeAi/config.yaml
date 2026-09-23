@@ -5,40 +5,9 @@ server:
   host: 0.0.0.0
   port: 8765
 
-camera:
-  # 摄像头标识(为多摄像头预留)
-  camera_id: "main"
-  # 信号源: 本地视频文件会用循环模拟 IP 摄像头(见 tools/gen_test_video.py);
-  # 真实摄像头请改成 RTSP 地址, 例如 rtsp://user:password@192.168.1.100:554/stream1
-  rtsp_url: "data/aa632867bcb79c54194e0cb63d43d882.mp4"
-  # 断开后重连间隔(秒), 随失败次数指数退避到 max_reconnect_delay
-  reconnect_delay: 2
-  max_reconnect_delay: 30
-  # 多久没收到新帧判定为卡死/断流(秒)
-  watchdog_timeout: 10
-
-pipeline:
-  # 传给插件的帧间隔控制(帧率上限), 0 表示不限制
-  max_fps: 20
-  # 缩放后再交给插件 (1 表示原图)
-  scale: 0.5
-
-storage:
-  snapshot_dir: "data/snapshots"
-  clips_dir: "data/clips"
-  db_path: "data/homeai.db"
-  # 保留多少天的记录/快照/录像
-  retain_days: 14
-
-clips:
-  # 事件前环形缓冲时长(秒)
-  buffer_sec: 15
-  # 录像帧率
-  fps: 12
-  # 录像分辨率缩放
-  scale: 0.5
-
-plugins:
+# 所有摄像头共享的插件集(用 YAML 锚点引用到各 cameras 条目)
+# 每路摄像头各自实例化一份(独立跟踪/报警状态)
+plugins: &person_plugins
   - name: person_intrusion
     enabled: true
     config:
@@ -53,9 +22,9 @@ plugins:
       # 运动事件是否保存前后时间段录像
       record_video: true
       # 事件前保留秒数(来自 clips.buffer_sec 覆盖, 不能超过 buffer_sec)
-      pre_sec: 5
+      pre_sec: 2
       # 事件后继续录制秒数
-      post_sec: 8
+      post_sec: 3
       #model args
       device: "cpu"                    # or "gpu"
       weightPath: "./backend/plugins/yolo26n.onnx" #"./models/cy_v20713.onnx"
@@ -70,7 +39,7 @@ plugins:
       # 至少向左移动 20 像素才认为真正进入
       min_move_px: 20
 
-      # 目标最多允许丢失 15 帧
+      # 目标最多允许丢失  帧
       max_track_age: 3
 
       # IoU 跟踪阈值
@@ -81,3 +50,45 @@ plugins:
 
       # 全局报警冷却
       debounce_sec: 10
+
+# ================== 摄像头列表 ==================
+# 每路: camera_id 唯一; rtsp_url 填本地视频会循环模拟 IP 摄像头;
+#       plugins 可选, 缺省该路仅供流不检测
+cameras:
+  - camera_id: "main"
+    rtsp_url: "data/aa632867bcb79c54194e0cb63d43d882.mp4"
+    # 断开后重连间隔(秒), 随失败次数指数退避到 max_reconnect_delay
+    reconnect_delay: 2
+    max_reconnect_delay: 30
+    # 多久没收到新帧判定为卡死/断流(秒)
+    watchdog_timeout: 10
+    plugins: *person_plugins
+
+  - camera_id: "door"
+    rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
+    reconnect_delay: 2
+    max_reconnect_delay: 30
+    watchdog_timeout: 10
+    plugins: *person_plugins
+
+# pipeline 全局默认(每路可在 cameras[i].pipeline 覆盖)
+pipeline:
+  # 传给插件的帧间隔控制(帧率上限), 0 表示不限制
+  max_fps: 30
+  # 缩放后再交给插件 (1 表示原图)
+  scale: 1
+
+storage:
+  snapshot_dir: "data/snapshots"
+  clips_dir: "data/clips"
+  db_path: "data/homeai.db"
+  # 保留多少天的记录/快照/录像
+  retain_days: 14
+
+clips:
+  # 事件前环形缓冲时长(秒)
+  buffer_sec: 15
+  # 录像帧率
+  fps: 12
+  # 录像分辨率缩放
+  scale: 1

@@ -183,10 +183,10 @@ class Storage:
             row = conn.execute("SELECT * FROM events WHERE id=?", (record_id,)).fetchone()
             if row is None:
                 return False
-            # 同一事件段的告警/快照/录像: 相同的 source, 触发时刻一致(毫秒级)
+            # 同一事件段的告警/快照/录像: 同摄像头 + 相同 source + 触发时刻一致(毫秒级)
             related = conn.execute(
-                "SELECT * FROM events WHERE source=? AND ts BETWEEN ? AND ?",
-                (row["source"], row["ts"] - 1000, row["ts"] + 1000),
+                "SELECT * FROM events WHERE camera_id=? AND source=? AND ts BETWEEN ? AND ?",
+                (row["camera_id"], row["source"], row["ts"] - 1000, row["ts"] + 1000),
             ).fetchall()
             ids = [r["id"] for r in related]
             rows = [dict(r) for r in related]

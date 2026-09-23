@@ -1,7 +1,6 @@
-"""FastAPI 入口: REST / WebSocket / MJPEG + 生命周期管理。"""
+"""FastAPI 入口: REST / WebSocket / MJPEG + 生命周期管理(支持多摄像头)。"""
 import asyncio
 import logging
-import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,11 +12,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_config
+from .core.cameras import Cameras
 from .core.events import EventBus, WsHub
-from .core.pipeline import Pipeline
-from .core.recorder import FrameRecorder
-from .core.stream import CameraSource
-from .plugins import PluginManager
 from .storage import Storage
 
 log = logging.getLogger(__name__)
@@ -34,46 +30,25 @@ async def lifespan(app: FastAPI):
     hub = WsHub(bus)
 
     storage = Storage(cfg, bus)
-    recorder = FrameRecorder(cfg, bus)
-    plugins = PluginManager(cfg, bus)
-
-    def on_camera_status(status: str) -> None:
-        bus.publish("camera_status", status=status, source="camera",
-                    summary=f"摄像头状态: {status}", ts=time.time())
-
-    camera = CameraSource(
-        rtsp_url=str(cfg.get("camera", "rtsp_url", "")),
-        reconnect_delay=float(cfg.get("camera", "reconnect_delay", 2)),
-        max_reconnect_delay=float(cfg.get("camera", "max_reconnect_delay", 30)),
-        watchdog_timeout=float(cfg.get("camera", "watchdog_timeout", 10)),
-        on_status=on_camera_status,
-    )
-
-    pipeline = Pipeline(cfg, plugins, recorder)
+    cameras = Cameras(cfg, bus)
 
     storage.start()
-    recorder.start()
-    plugins.load_all()
-    camera.subscribe(pipeline.feed)
-    camera.start()
+    cameras.start()
 
     app.state.cfg = cfg
     app.state.hub = hub
     app.state.bus = bus
-    app.state.camera = camera
-    app.state.plugins = plugins
+    app.state.cameras = cameras
     app.state.storage = storage
-    app.state.recorder = recorder
 
     hub_task = asyncio.create_task(_heartbeat_loop(hub))
-    log.info("home-ai started, rtsp=%s", camera.status())
+    ids = [f"{c.camera_id}({c.source.status()})" for c in cameras.units]
+    log.info("home-ai started, cameras: %s", ", ".join(ids) or "(none)")
 
     yield
 
     hub_task.cancel()
-    camera.stop()
-    plugins.shutdown()
-    recorder.stop()
+    cameras.stop()
     storage.stop()
     log.info("home-ai stopped")
 
@@ -112,11 +87,18 @@ async def index():
 
 
 # ---------- MJPEG 实时流 ----------
-@app.get("/cam/stream")
-async def cam_stream():
+def _unit_or_404(camera_id: str = ""):
+    cameras = app.state.cameras
+    unit = cameras.get(camera_id) if camera_id else cameras.default()
+    if unit is None:
+        raise HTTPException(status_code=404, detail="camera not found")
+    return unit
+
+
+async def _mjpeg(unit):
     async def gen():
         while True:
-            frame = app.state.camera.latest_frame()
+            frame = unit.source.latest_frame()
             if frame is not None:
                 ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                 if ok:
@@ -125,6 +107,16 @@ async def cam_stream():
             await asyncio.sleep(0.06)
 
     return StreamingResponse(gen(), media_type=f"multipart/x-mixed-replace; boundary={BOUNDARY}")
+
+
+@app.get("/cam/stream")
+async def cam_stream():
+    return await _mjpeg(_unit_or_404())
+
+
+@app.get("/cam/{camera_id}/stream")
+async def camera_stream(camera_id: str):
+    return await _mjpeg(_unit_or_404(camera_id))
 
 
 # ---------- 快照 / 录像 ----------
@@ -141,26 +133,41 @@ async def clip(path: str):
 # ---------- API ----------
 @app.get("/api/status")
 async def api_status():
-    cam = app.state.camera
+    cameras = app.state.cameras
+    units = cameras.status()
+    default = cameras.default()
+    cam = {"status": "stopped", "fps": 0.0, "frame_id": 0}
+    if default:
+        cam = {"status": default.source.status(),
+               "fps": round(default.source.fps(), 1),
+               "frame_id": default.source.frame_id()}
     return {
-        "camera": {"status": cam.status(), "fps": round(cam.fps(), 1), "frame_id": cam.frame_id()},
-        "plugins": app.state.plugins.status(),
+        "camera": cam,  # 兼容旧字段(默认摄像头)
+        "cameras": units,
+        "plugins": cameras.all_plugins(),
         "ws_clients": app.state.hub.client_count(),
     }
 
 
 @app.get("/api/plugins")
 async def api_plugins():
-    return app.state.plugins.status()
+    return app.state.cameras.all_plugins()
+
+
+@app.post("/api/cameras/{camera_id}/plugins/{name}/toggle")
+async def api_camera_plugin_toggle(camera_id: str, name: str):
+    result = app.state.cameras.toggle_plugin(camera_id, name)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"plugin not found: {camera_id}/{name}")
+    return result
 
 
 @app.post("/api/plugins/{name}/toggle")
 async def api_plugin_toggle(name: str):
-    plugin = app.state.plugins.plugin(name)
-    if plugin is None:
+    result = app.state.cameras.toggle_plugin_first(name)
+    if result is None:
         raise HTTPException(status_code=404, detail=f"plugin not found: {name}")
-    plugin.set_enabled(not plugin.is_enabled())
-    return {"name": name, "enabled": plugin.is_enabled()}
+    return result
 
 
 @app.get("/api/events")
