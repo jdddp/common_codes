@@ -1,11 +1,11 @@
 # 家庭 AI 摄像头系统 — 设计文档
 
-> 版本: v0.6（已纳入架构评审反馈） | 状态: 已确认, 待实现
+> 版本: v0.7（当前实现已联调通过）| 状态: 实现中/部分验收
 
 ## 1. 目标与设计决策
 
 - RTSP 摄像头画面实时在浏览器查看
-- 插件化 AI 能力（先做运动检测，后续加人形/物体检测等）；新功能 = 新增一个 Plugin 类 + 一段 config，不动其他代码
+- 插件化 AI 能力（当前已实现：人员入侵 ONNX 检测；运动检测可作独立插件沿用同一套机制）；新功能 = 新增一个 Plugin 类 + 一段 config，不动其他代码
 - **记录是唯一真相来源**：前端全部展示来自查询接口；无论 WS 掉线 / 浏览器关闭 / 后端重启都不影响历史
 - **只有 Storage 有权创建记录**：插件只 `emit` 事件，不直接碰数据库、前端、WS、摄像头
 - **职责边界**：
@@ -25,12 +25,12 @@
                        ▼
                     Pipeline          ← 唯一帧分发者(统一帧率/缩放)
                        │
-             ┌─────────┼─────────┐
-             ▼         ▼         ▼
-          Motion    YOLO      Future
-          Plugin    Plugin     Plugin
-             │         │         │
-             └─────────┼─────────┘
+┌─────────┼─────────┐
+              ▼         ▼         ▼
+           Person   Motion    Future
+           Plugin   Plugin    Plugin
+              │         │         │
+              └─────────┼─────────┘
                        │ 只 emit 事件
                     EventBus        ← 内部事件总线
                        │
@@ -81,8 +81,9 @@ homeAi/
 │   │   └── pipeline.py      # 帧管线：唯一帧分发者(缩放/节流)
 │   └── plugins/
 │       ├── base.py          # BasePlugin 基类
-│       ├── motion.py        # 运动检测(状态机：事件段内只落一条记录)
-│       └── __init__.py      # PluginManager 动态加载
+│       ├── person_intrusion.py  # 人员入侵检测(ONNX YOLO, 事件段内只落一条记录)
+│       ├── yolo26n.onnx     # 检测模型(COCO80, 本地推理)
+│       └── __init__.py      # PluginManager 动态加载(snake_case→CamelCase)
 ├── frontend/
 │   ├── index.html / app.js / style.css
 └── data/                    # 运行时数据：snapshots/ clips/ homeai.db（不提交 git）
@@ -90,6 +91,7 @@ homeAi/
 
 ### 4.1 CameraSource（采集线程）
 - 独立线程读帧；自动重连（指数退避、封顶）、看门狗（`watchdog_timeout` 无帧即重连）
+- **支持本地视频模拟**：`rtsp_url` 填本地视频路径或 `file://` 前缀时，按原帧率节流并循环播放，等价一路 IP 摄像头
 - 暴露 `status`：stopped/connecting/running/error，状态变化发事件（供落库）
 - **插件不直接订阅/取帧**：帧只交给 Pipeline；CameraSource 提供 `latest_frame()` 仅供 MJPEG/快照等全局用途
 
@@ -99,12 +101,12 @@ homeAi/
 
 ### 4.3 EventBus + WsHub（职责严格分离）
 - **EventBus**：内部事件发布订阅 — `motion / snapshot / alert / record_clip / camera_status / system`；`publish(kind, **payload)` / `subscribe(kind, cb)`（`"*"` 通配）
-- **WsHub**：只管理 WS 连接与广播 `record_created` 信号；**插件不得调用 WsHub / 不得感知浏览器**
-- 信号流：Storage 落库后发 `record_created` → WsHub 广播 → 前端拉 REST
+- **WsHub**：只管理 WS 连接与广播轻量信号（`record_created` / `record_deleted`）；**插件不得调用 WsHub / 不得感知浏览器**
+- 信号流：Storage 落库后发 `record_created` → WsHub 广播 → 前端拉 REST；删除记录时 Storage 逐条发 `record_deleted` → 前端内存移除
 
 ### 4.4 PluginManager & BasePlugin（核心扩展点）
-- 按 `config.yaml -> plugins` 用 importlib 动态加载；按 `every_n_frames` 节流
-- 插件异常捕获，不拖垮采集线程；`status()` 供前端查看启停/错误
+- 按 `config.yaml -> plugins` 用 importlib 动态加载；`name` 用 snake_case，加载器自动 `PersonIntrusionPlugin` 类名映射；按 `every_n_frames` 节流
+- 插件异常捕获，不拖垮采集线程；`status()` 供前端查看启停/错误；模型缺失时优雅降级（`last_error`），不阻断取流
 - **插件唯一职责 = 产生事件**；不得直接访问 Storage / WsHub / CameraSource / SQLite
 
 ```python
@@ -118,14 +120,18 @@ class BasePlugin:
     def emit_alert(self, summary, **payload)           # 发布告警
 ```
 
-**事件 vs 状态（状态机）**：Motion Plugin 维护 `IDLE → MOTION → COOLDOWN → IDLE`，一个事件段（开始运动→结束）只产生一条 `alert` + 一条 `clip` 记录，绝不按帧刷屏。
+**事件 vs 状态（状态机）**：插件维护 `IDLE → COOLDOWN → IDLE`（如 PersonIntrusionPlugin），
+一个事件段只产生一条 `alert` + 一条 `clip` + 一条 `snapshot` 记录，绝不按帧刷屏；
+同一事件段的三条记录共享同一 `ts`，是级联删除的依据（见 4.5）。
 
 ### 4.5 Storage（记录形成模块 — 唯一写记录权限）
 - 独立工作线程 + 队列，不阻塞采集/插件线程
 - 订阅 `snapshot`（含帧）：编码 JPEG → `data/snapshots/YYYYMMDD/xxx.jpg` → 落库
 - 订阅 `alert / camera_status / system / clip`：写 SQLite `events` 表
-- **只有 Storage 能写 SQLite**；每落一条 → 发 `record_created` 供 WsHub 广播
-- 提供 `list_events()`、`last_id()`；按 `retain_days` 自动清理记录、快照、录像
+- **只有 Storage 能写/删 SQLite 与媒体文件**；每落一条 → 发 `record_created`，每删一条 → 发 `record_deleted`
+- 提供 `list_events(after_id, limit, day=)`（day=YYYY-MM-DD 本地时区区间过滤）、`list_days()`（按天聚合+计数）、`last_id()`、`delete_record(id)`
+- **级联删除**：按同 `source` + `ts ±1s` 归组同一事件段（snapshot/clip/alert 共享触发时刻），一次删净并清理全部关联快照/录像文件 → 逐条广播 `record_deleted`
+- 按 `retain_days` 自动清理记录、快照、录像
 
 **events 表：**
 
@@ -161,19 +167,23 @@ v1:  RTSP/H264 → OpenCV解码 → BGR → JPEG → 内存 → 解JPEG → Vide
 Pipeline ─帧─► 插件 ─emit─► EventBus ─► Storage(落库) ─record_created─► WsHub ─► 前端
                         └─► FrameRecorder(record_clip) ─产clip─► Storage
 
-运动事件段（状态机保证一段只落一条）
-  开始运动 ─► emit snapshot(含帧+框)  → Storage 落盘+落库 → 广播
-              emit record_clip(前后秒) → FrameRecorder 剪辑 mp4 → 落库(kind=clip) → 广播
-              emit alert(摘要)        → Storage 落库 → 广播
+入侵事件段（状态机保证一段只落一套记录, 共享同一 ts）
+  检到人  ─► emit snapshot(含帧+框)  → Storage 落盘+落库 → 广播
+             emit record_clip(前后秒) → FrameRecorder 剪辑 mp4 → 落库(kind=clip) → 广播
+             emit alert(摘要)        → Storage 落库 → 广播
 摄像头断线/恢复 ─► emit camera_status → Storage 落库 → 广播
 系统启动/停止   ─► emit system        → Storage 落库 → 广播
+
+删除（用户在前端点删除）
+  前端 DELETE /api/events/{id} ─► Storage 级联删同事件段记录+媒体文件 ─record_deleted(逐条)─► WsHub ─► 所有前端
 ```
 
 ## 6. 前端仪表板（单页）
 
-- 实时画面区：MJPEG 影像
-- 记录列表：三路自动同步（初次载入 / 收到信号增量 / 重连补拉）
-- 快照墙 / 录像区：缩略图点击看大图；录像内嵌 `<video>` 播放，播放不了提供下载
+- 实时画面区：MJPEG 影像，支持**暂停/继续**（按钮或 P 键，同屏多人看固定帧）
+- 记录列表：三路自动同步（初次载入 / 收到信号增量 / 重连补拉），按**天分组**（今天/昨天/日期）
+- **按天过滤**：顶部日期条（`/api/events/days` 聚合计数），点击显式筛选某天或全部
+- 快照墙 / 录像区：缩略图点击看大图；录像内嵌 `<video>` 播放 + **下载按钮**；记录卡片带删除按钮
 - 状态栏：摄像头连线、帧率、插件启停（初次载入）
 - 深色仪表板，响应式
 
@@ -186,10 +196,12 @@ Pipeline ─帧─► 插件 ─emit─► EventBus ─► Storage(落库) ─re
 | GET | /snapshots/{path} | 快照图片 |
 | GET | /clips/{path} | 事件录像 mp4 |
 | GET | /api/status | 摄像头 + 插件状态 |
-| GET | /api/events?after_id=&limit=&kind= | 记录历史/增量 |
+| GET | /api/events?after_id=&limit=&kind=&day= | 记录历史/增量（day=YYYY-MM-DD 按天过滤） |
+| GET | /api/events/days | 按天聚合成列表（含计数） |
+| DELETE | /api/events/{id} | 删除记录（级联删同一事件段+媒体文件） |
 | GET | /api/plugins | 插件状态 |
 | POST | /api/plugins/{name}/toggle | 插件启停 |
-| WS | /ws/events | 新记录信号 `{type:"record_created", record_id:n}` |
+| WS | /ws/events | 轻量信号 `{type:"record_created"|"record_deleted", record_id:n}` |
 
 ## 7. 数据与配置
 
@@ -201,7 +213,7 @@ Pipeline ─帧─► 插件 ─emit─► EventBus ─► Storage(落库) ─re
 ```yaml
 camera:
   camera_id: "main"          # 未来多摄像头：客厅/门口/阳台...
-  rtsp_url: "rtsp://user:password@192.168.1.100:554/stream1"
+  rtsp_url: "data/sample.mp4" # 本地视频循环模拟; RTSP: rtsp://user:password@host/stream1
   reconnect_delay: 2
   max_reconnect_delay: 30
   watchdog_timeout: 10
@@ -221,23 +233,21 @@ clips:
   scale: 0.5          # 录像分辨率缩放
 
 plugins:
-  - name: motion
+  - name: person_intrusion   # 人员入侵检测(ONNX 本地推理)
     enabled: true
     config:
-      threshold: 900      # 灵敏度
-      debounce_sec: 10    # 防抖
-      roi: []             # 检测区域
-      save_snapshot: true
-      record_video: true  # 运动事件是否录像
-      pre_sec: 5          # 事件前保留秒数
-      post_sec: 8         # 事件后继续录制秒数
+      weight_path: "./backend/plugins/yolo26n.onnx"
+      conf_threshold: 0.1     # 检测置信度阈值
+      pre_sec: 3              # 事件前保留秒数
+      post_sec: 5             # 事件后继续录制秒数
+      every_n_frames: 5       # 每 N 帧处理一次检测
 ```
 
 ## 8. 扩展路线
 
 | 功能 | 做法 |
-|---|---|
-| 人形/物体检测 | 新增插件调用 RKNN/ONNX/YOLO，同一套 emit 机制 |
+|---|---|---|
+| 运动检测 | 独立插件(参考 person_intrusion 状态机)，阈值判定帧间差异 |
 | 多摄像头 | 每路一个 CameraSource+Pipeline；events 表已带 camera_id，DB 免改 |
 | 录像低 CPU | 升级 FFmpeg H264 packet ring + remux（不重编码），替换 FrameRecorder 内部实现 |
 | PTZ / 实时调参 | 复用 WS 通道承载双向指令 |
@@ -259,3 +269,15 @@ plugins:
 | 8 | 预留 camera_id | events 表已加列 |
 | 9 | ts 改整数毫秒 | ts INTEGER，Unix 毫秒 |
 | 10 | 接口表重复 /api/status | 已去重核对 |
+
+## 10. v0.7 实现记录
+
+| # | 变更 | 说明 |
+|---|---|---|
+| 1 | 人员入侵插件 | `person_intrusion.py`（ONNX YOLO 本地推理），状态机 IDLE→COOLDOWN；`motion` 移出默认配置，可复用同一套框架取回 |
+| 2 | 本地视频模拟 | CameraSource 支持文件路径/`file://` 循环取流；`tools/gen_test_video.py` 生成测试视频，无摄像头可开发调试 |
+| 3 | 实时画面暂停 | 前端按钮/P 键切换，MJPEG 暂停画面 |
+| 4 | 按天分组 + 过滤 | `GET /api/events/days` + `?day=` 参数（本地时区），前端日期选择条 |
+| 5 | 级联删除 | `DELETE /api/events/{id}` → 同 `source` + `ts±1s` 归组删除 + 清理媒体文件 + 逐条 `record_deleted` 广播 |
+| 6 | 录像下载 | clip 卡片下载按钮（`<a download>`, 同源） |
+| 7 | 信号扩展 | WS 信号含 `record_created` / `record_deleted`，前端/重连均同步 |

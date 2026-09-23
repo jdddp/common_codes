@@ -178,6 +178,23 @@ body {
 .thumb { width: 150px; height: auto; max-height: 110px; object-fit: cover; border-radius: 6px; cursor: zoom-in; }
 .media video { width: 150px; border-radius: 6px; background: #000; }
 
+.rec-dl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 150px;
+  padding: 4px 0;
+  font-size: 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  color: var(--accent);
+  background: rgba(76, 158, 255, .12);
+  border: 1px solid rgba(76, 158, 255, .4);
+}
+.rec-dl:hover { background: rgba(76, 158, 255, .22); }
+.rec-dl.hidden { display: none; }
+
 .meta { display: flex; flex-direction: column; gap: 6px; }
 .row1 { display: flex; align-items: center; gap: 8px; }
 .kind-badge {

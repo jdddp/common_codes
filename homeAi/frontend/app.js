@@ -75,11 +75,15 @@ function buildRecord(ev) {
   const thumb = frag.querySelector(".thumb");
   const link = frag.querySelector(".thumb-link");
   const video = frag.querySelector(".clip");
+  const dl = frag.querySelector(".rec-dl");
 
   if (ev.kind === "clip" && ev.meta && ev.meta.clip_path) {
     video.src = `/clips/${ev.meta.clip_path}`;
     video.style.display = "block";
     link.remove();
+    dl.href = `/clips/${ev.meta.clip_path}`;
+    dl.download = ev.meta.clip_path.split("/").pop();
+    dl.classList.remove("hidden");
   } else if (ev.snapshot_path) {
     thumb.src = `/snapshots/${ev.snapshot_path}`;
     link.href = `/snapshots/${ev.snapshot_path}`;
@@ -88,9 +92,11 @@ function buildRecord(ev) {
       openLightbox(link.href);
     });
     video.remove();
+    dl.remove();
   } else {
     link.remove();
     video.remove();
+    dl.remove();
   }
   return art;
 }

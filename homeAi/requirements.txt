@@ -4,3 +4,4 @@ websockets>=10
 opencv-python-headless>=4.0
 numpy>=1.20
 PyYAML>=5.4
+onnxruntime>=1.16
