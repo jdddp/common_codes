@@ -73,18 +73,18 @@ cameras:
     # 轻量手段: 低帧率 + CRF 压缩; 不建索引库(文件名即时间戳); 清理器按 mtime 删旧片
     lapse: &lapse_cfg
       enabled: true
-      file_hours: 0.05          # M = 每个文件存多少小时
-      keep_days: 7           # N = 保留最近多少天
+      file_hours: 0.01          # M = 每个文件存多少小时
+      keep_days: 5           # N = 保留最近多少天
       fps: 8                 # 录像帧率(低=省 CPU/容量)
       crf: 27                # H.264 质量档(小=清晰, 大=省容量)
 
-  # - camera_id: "door"
-  #   rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
-  #   reconnect_delay: 2
-  #   max_reconnect_delay: 30
-  #   watchdog_timeout: 10
-  #   plugins: []
-  #   lapse: *lapse_cfg
+  - camera_id: "door"
+    rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
+    reconnect_delay: 2
+    max_reconnect_delay: 30
+    watchdog_timeout: 10
+    plugins: []
+    lapse: *lapse_cfg             # H.264 质量档(小=清晰, 大=省容量)
 
 # pipeline 全局默认(每路可在 cameras[i].pipeline 覆盖)
 pipeline:
