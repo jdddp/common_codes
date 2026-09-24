@@ -56,7 +56,9 @@ cameras:
   - camera_id: "door"
     rtsp_url: "data/25437....mp4"      # 第二路摄像头
     plugins: *person
+    lapse: *lapse_cfg                 # 持续录像配置可复用
 ```
+- 每路可在条目内加 `lapse:` 开启**持续录像(实时存储)**：`file_hours`(每 M 小时一个文件)、`keep_days`(保留最近 N 天)、`fps`(录像帧率)、`crf`(H.264 质量)。不配置该段则该路不持续录像。
 - 仍兼容旧版单摄像头写法（顶层 `camera:` + `plugins:`），无 `cameras` 时自动派生一路。
 - `storage`、`clips`、`pipeline` 为全局设置；每路的 `pipeline`/重连参数可在该相机条目内覆盖。
 - 可用环境变量 `HOAI_CONFIG` 指定其他配置文件路径。
@@ -69,6 +71,7 @@ cameras:
 | GET | /cam/{camera_id}/stream | 指定摄像头的 MJPEG 实时流 |
 | GET | /snapshots/{path} | 快照图片 |
 | GET | /clips/{path} | 事件录像 mp4 |
+| GET | /lapse/{camera_id}/{filename} | 持续录像分片 mp4（播放/下载） |
 | GET | /api/status | 所有摄像头 + 插件状态（cameras 列表） |
 | GET | /api/events?after_id=&limit=&kind=&day= | 记录历史/增量（day=YYYY-MM-DD 按天过滤） |
 | GET | /api/events/days | 按天分组的记录天数+计数 |
@@ -97,6 +100,7 @@ backend/
   core/stream.py        摄像头采集线程(支持本地视频循环)
   core/pipeline.py      帧分发者
   core/recorder.py      事件录像剪辑(每路独立缓冲)
+  core/lapse.py         持续录像分片(ffmpeg segment, N 天清理)
   core/events.py        EventBus + WsHub
   plugins/              插件(人员检测等)
     yolo26n.onnx        检测模型

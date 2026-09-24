@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from ..config import Config
 from ..core.events import EventBus
+from ..core.lapse import LapseRecorder
 from ..core.pipeline import Pipeline
 from ..core.recorder import FrameRecorder
 from ..core.stream import CameraSource
@@ -75,12 +76,29 @@ class CameraUnit:
         self.plugins = PluginManager(spec.get("plugins") or [], bus, camera_id=self.camera_id)
         self.pipeline = Pipeline(scale, self.plugins, self.recorder)
 
+        # 持续录像(可选): 仅当该路配置了 lapse 段才创建
+        lapse_cfg = spec.get("lapse")
+        self.lapse = (
+            LapseRecorder(
+                camera_id=self.camera_id,
+                lapse_cfg=lapse_cfg,
+                lapse_dir=str(cfg.get("storage", "lapse_dir", "data/lapse")),
+                bus=bus,
+            )
+            if lapse_cfg is not None
+            else None
+        )
+
         self.source.subscribe(self.pipeline.feed)
+        if self.lapse is not None and self.lapse.enabled:
+            self.source.subscribe(self.lapse.push)
 
     # ---------- 生命周期 ----------
     def start(self) -> None:
         self.recorder.start()
         self.plugins.load_all()
+        if self.lapse is not None:
+            self.lapse.start()
         self.source.start()
         log.info("camera unit started: %s (%s)", self.camera_id, self.rtsp_url or "(rtsp)")
 
@@ -88,6 +106,8 @@ class CameraUnit:
         self.source.stop()
         self.plugins.shutdown()
         self.recorder.stop()
+        if self.lapse is not None:
+            self.lapse.stop()
 
     def status(self) -> Dict[str, Any]:
         return {

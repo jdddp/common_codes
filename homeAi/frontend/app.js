@@ -91,6 +91,14 @@ function buildRecord(ev) {
     dl.href = `/clips/${ev.meta.clip_path}`;
     dl.download = ev.meta.clip_path.split("/").pop();
     dl.classList.remove("hidden");
+  } else if (ev.kind === "lapse" && ev.meta && ev.meta.lapse_path) {
+    const url = `/lapse/${ev.camera_id}/${ev.meta.lapse_path}`;
+    video.src = url;
+    video.style.display = "block";
+    link.remove();
+    dl.href = url;
+    dl.download = ev.meta.lapse_path.split("/").pop();
+    dl.classList.remove("hidden");
   } else if (ev.snapshot_path) {
     thumb.src = `/snapshots/${ev.snapshot_path}`;
     link.href = `/snapshots/${ev.snapshot_path}`;

@@ -38,19 +38,25 @@ plugins: &person_plugins
       entry_zone_ratio: 0.2
       # 至少向左移动 20 像素才认为真正进入
       min_move_px: 20
-
       # 目标最多允许丢失  帧
       max_track_age: 3
-
       # IoU 跟踪阈值
       track_iou_threshold: 0.20
-
       # 中心点最大匹配距离
       track_distance_ratio: 0.12
-
       # 全局报警冷却
       debounce_sec: 10
 
+# motion_entry: &motion_entry
+#   name: motion
+#   enabled: true
+#   config:
+#     threshold: 900
+
+# # 組合 A: person + motion
+# both_plugins: &both_plugins
+#   - *person_entry
+#   - *motion_entry
 # ================== 摄像头列表 ==================
 # 每路: camera_id 唯一; rtsp_url 填本地视频会循环模拟 IP 摄像头;
 #       plugins 可选, 缺省该路仅供流不检测
@@ -63,13 +69,22 @@ cameras:
     # 多久没收到新帧判定为卡死/断流(秒)
     watchdog_timeout: 10
     plugins: *person_plugins
+    # 持续录像(实时存储): 每 M 小时一个 H.264 分片, 动态保留最近 N 天
+    # 轻量手段: 低帧率 + CRF 压缩; 不建索引库(文件名即时间戳); 清理器按 mtime 删旧片
+    lapse: &lapse_cfg
+      enabled: true
+      file_hours: 1          # M = 每个文件存多少小时
+      keep_days: 7           # N = 保留最近多少天
+      fps: 8                 # 录像帧率(低=省 CPU/容量)
+      crf: 27                # H.264 质量档(小=清晰, 大=省容量)
 
-  - camera_id: "door"
-    rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
-    reconnect_delay: 2
-    max_reconnect_delay: 30
-    watchdog_timeout: 10
-    plugins: *person_plugins
+  # - camera_id: "door"
+  #   rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
+  #   reconnect_delay: 2
+  #   max_reconnect_delay: 30
+  #   watchdog_timeout: 10
+  #   plugins: []
+  #   lapse: *lapse_cfg
 
 # pipeline 全局默认(每路可在 cameras[i].pipeline 覆盖)
 pipeline:
@@ -81,6 +96,7 @@ pipeline:
 storage:
   snapshot_dir: "data/snapshots"
   clips_dir: "data/clips"
+  lapse_dir: "data/lapse"   # 持续录像(实时存储)根目录, 每路一个子目录
   db_path: "data/homeai.db"
   # 保留多少天的记录/快照/录像
   retain_days: 14

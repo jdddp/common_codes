@@ -30,6 +30,7 @@ class Storage:
         self._bus = bus
         self._snapshot_dir = str(config.get("storage", "snapshot_dir", "data/snapshots"))
         self._clips_dir = str(config.get("storage", "clips_dir", "data/clips"))
+        self._lapse_dir = str(config.get("storage", "lapse_dir", "data/lapse"))
         self._db_path = str(config.get("storage", "db_path", "data/homeai.db"))
         self._retain_days = int(config.get("storage", "retain_days", 14))
         self._camera_id = str(config.get("camera", "camera_id", "main"))
@@ -44,7 +45,7 @@ class Storage:
         os.makedirs(self._snapshot_dir, exist_ok=True)
         self._init_db()
         self._bus.subscribe("snapshot", lambda e: self._queue.append(("snapshot", e)))
-        for kind in ("alert", "clip", "camera_status", "system"):
+        for kind in ("alert", "clip", "camera_status", "system", "lapse"):
             self._bus.subscribe(kind, lambda e: self._queue.append(("record", e)))
         self._running = True
         self._thread = threading.Thread(target=self._worker, name="storage", daemon=True)
@@ -105,6 +106,11 @@ class Storage:
     def _insert(self, event: Dict[str, Any]) -> None:
         ts_ms = self._to_ms(event.get("ts") or time.time())
         meta = event.get("meta", {})
+        if event.get("kind") == "lapse" and meta.get("lapse_path") and self._lapse_path_exists(
+            event.get("camera_id") or self._camera_id, meta["lapse_path"]
+        ):
+            # 持续录像分片名全局唯一: 重启/重复检测不再重复入库
+            return
         meta_str = json.dumps(meta, ensure_ascii=False) if meta else ""
         conn = sqlite3.connect(self._db_path)
         try:
@@ -126,6 +132,19 @@ class Storage:
         finally:
             conn.close()
         self._bus.publish("record_created", record_id=record_id)
+
+    def _lapse_path_exists(self, camera_id: str, lapse_path: str) -> bool:
+        # meta 内以 "lapse_path": "文件名" 形式 json.dumps 存储(ensure_ascii=False)
+        needle = '"lapse_path": "' + lapse_path + '"'
+        conn = sqlite3.connect(self._db_path)
+        try:
+            rows = conn.execute(
+                "SELECT 1 FROM events WHERE kind='lapse' AND camera_id=? AND meta LIKE ? LIMIT 1",
+                (camera_id, "%" + needle + "%"),
+            ).fetchall()
+            return bool(rows)
+        finally:
+            conn.close()
 
     # ---------- 查询 ----------
     def list_events(
@@ -198,7 +217,7 @@ class Storage:
         finally:
             conn.close()
 
-        # 清理关联媒体文件(所有关联记录的快照 + 录像)
+        # 清理关联媒体文件(所有关联记录的快照 + 录像 + 持续录像分片)
         files = set()
         for r in rows:
             if r.get("snapshot_path"):
@@ -207,6 +226,9 @@ class Storage:
             clip = meta.get("clip_path")
             if clip:
                 files.add(os.path.join(self._clips_dir, clip))
+            lapse = meta.get("lapse_path")
+            if lapse:
+                files.add(os.path.join(self._lapse_dir, r.get("camera_id") or "", lapse))
         for path in files:
             self._remove_file(path)
 

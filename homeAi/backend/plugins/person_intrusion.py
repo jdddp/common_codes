@@ -862,5 +862,3 @@ class PersonIntrusionPlugin(BasePlugin):
 
 
 PersonPlugin = PersonIntrusionPlugin
-
-

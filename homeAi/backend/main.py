@@ -67,6 +67,7 @@ def _media_paths() -> dict:
     return {
         "snapshot": Path(app.state.cfg.get("storage", "snapshot_dir", "data/snapshots")),
         "clip": Path(app.state.cfg.get("storage", "clips_dir", "data/clips")),
+        "lapse": Path(app.state.cfg.get("storage", "lapse_dir", "data/lapse")),
     }
 
 
@@ -128,6 +129,17 @@ async def snapshot(path: str):
 @app.get("/clips/{path:path}")
 async def clip(path: str):
     return FileResponse(_safe_media_file("clip", path))
+
+
+@app.get("/lapse/{camera_id}/{path:path}")
+async def lapse(camera_id: str, path: str):
+    root = (_media_paths()["lapse"] / camera_id).resolve()
+    full = (root / path).resolve()
+    if root != full.parent and root not in full.parents:
+        raise HTTPException(status_code=404, detail="not found")
+    if not full.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(full)
 
 
 # ---------- API ----------
