@@ -39,7 +39,7 @@ plugins: &person_plugins
       # 至少向左移动 20 像素才认为真正进入
       min_move_px: 150
       # 目标最多允许丢失  帧
-      max_track_age: 3
+      max_track_age: 1
       # IoU 跟踪阈值
       track_iou_threshold: 0.2
       # 中心点最大匹配距离
@@ -64,15 +64,15 @@ cameras:
     rtsp_url: "rtsp://admin:admin@192.168.53.15/live/chn=0"
     # rtsp_url: "data/aa632867bcb79c54194e0cb63d43d882.mp4"
     # 断开后重连间隔(秒), 随失败次数指数退避到 max_reconnect_delay
-    reconnect_delay: 2
-    max_reconnect_delay: 30
+    reconnect_delay: 5
+    max_reconnect_delay: 300
     # 多久没收到新帧判定为卡死/断流(秒)
     watchdog_timeout: 10
     plugins: *person_plugins
     # 持续录像(实时存储): 每 M 小时一个 H.264 分片, 动态保留最近 N 天
     # 轻量手段: 低帧率 + CRF 压缩; 不建索引库(文件名即时间戳); 清理器按 mtime 删旧片
     lapse: &lapse_cfg
-      enabled: false
+      enabled: true
       file_hours: 1          # M = 每个文件存多少小时
       keep_days: 5           # N = 保留最近多少天
       fps: 8                 # 录像帧率(低=省 CPU/容量)

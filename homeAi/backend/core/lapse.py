@@ -103,7 +103,6 @@ class LapseRecorder:
                 proc.terminate()
             except Exception:
                 pass
-        newest = None
         try:
             files = sorted(
                 (os.path.join(self._out_dir, n) for n in os.listdir(self._out_dir) if n.endswith(".mp4")),
@@ -112,11 +111,11 @@ class LapseRecorder:
         except OSError:
             return
         # ffmpeg 已退出, 所有分片都已写完: 逐个补录尚未落库的
-        for path in files:
+        for i, path in enumerate(files):
             name = os.path.basename(path)
             if name in self._recorded or os.path.getsize(path) < 4096:
                 continue
-            self._record(name, path)
+            self._record(name, path, start_ms=self._prev_mtime_ms(files, i))
 
     # ---------- 帧入口(由 CameraUnit 挂到 CameraSource) ----------
     def push(self, frame: np.ndarray, frame_id: int) -> None:
@@ -222,16 +221,13 @@ class LapseRecorder:
             self._sleep(_MONITOR_INTERVAL)
 
     def _check_finalized(self) -> None:
-        files = sorted(
-            (os.path.join(self._out_dir, n) for n in os.listdir(self._out_dir) if n.endswith(".mp4")),
-            key=os.path.getmtime,
-        )
+        files = self._sorted_segments()
         if len(files) < 2:
             return
         # 最新的文件是"正在写"的; 其余 mtime 已冻结 => 已完成分片
         recheck = files[:-1]
         now = time.time()
-        for path in recheck:
+        for i, path in enumerate(recheck):
             name = os.path.basename(path)
             if name in self._recorded:
                 continue
@@ -239,32 +235,70 @@ class LapseRecorder:
                 continue
             if os.path.getsize(path) < 4096:
                 continue
-            self._record(name, path)
+            self._record(name, path, start_ms=self._prev_mtime_ms(files, i))
 
     def _record_prior_segments(self) -> None:
         """启动时补记之前已完成的旧分片(上次运行遗留)。"""
         try:
-            for n in os.listdir(self._out_dir):
-                if not n.endswith(".mp4"):
-                    continue
-                path = os.path.join(self._out_dir, n)
-                if os.path.getmtime(path) < self._session_start:
-                    self._recorded.add(n)
-                    self._record(n, path)
+            files = self._sorted_segments()
         except OSError:
-            pass
+            return
+        for i, path in enumerate(files):
+            if not os.path.basename(path).endswith(".mp4"):
+                continue
+            if os.path.getmtime(path) >= self._session_start:
+                continue
+            name = os.path.basename(path)
+            self._recorded.add(name)
+            self._record(name, path, start_ms=self._prev_mtime_ms(files, i))
 
-    def _record(self, name: str, path: str) -> None:
-        snap = self._bus.publish(
+    def _sorted_segments(self) -> list:
+        return sorted(
+            (os.path.join(self._out_dir, n) for n in os.listdir(self._out_dir) if n.endswith(".mp4")),
+            key=os.path.getmtime,
+        )
+
+    @staticmethod
+    def _prev_mtime_ms(files: list, index: int) -> Optional[int]:
+        """上一分片的结束时间(= 本分片开始时间, 毫秒); 首片无上一片时返回 None。"""
+        if index > 0:
+            try:
+                return int(os.path.getmtime(files[index - 1]) * 1000)
+            except OSError:
+                return None
+        return None
+
+    def _record(self, name: str, path: str, start_ms: Optional[int] = None) -> None:
+        """落库一个已完成分片。真实起止时间写入 meta.file_start/file_end(毫秒);
+        首片无上一分片时, start 回退到文件名时间。"""
+        end_ms = int(os.path.getmtime(path) * 1000)
+        if start_ms is None:
+            start_ms = self._name_time_ms(name) or end_ms
+        self._bus.publish(
             "lapse",
             camera_id=self._camera_id,
             source="lapse",
             summary=f"持续录像({self._file_hours:g}h/段)",
             ts=os.path.getmtime(path),
-            meta={"lapse_path": name, "file_hours": self._file_hours, "fps": self._fps},
+            meta={
+                "lapse_path": name,
+                "file_hours": self._file_hours,
+                "fps": self._fps,
+                "file_start": start_ms,
+                "file_end": end_ms,
+            },
         )
         log.info("[%s] lapse segment recorded: %s (%d bytes)", self._camera_id, name,
                  os.path.getsize(path))
+
+    @staticmethod
+    def _name_time_ms(name: str) -> Optional[int]:
+        """文件名 YYYYMMDD_HHMMSS(本地时区) => 毫秒。"""
+        m = name.split(".")[0]
+        try:
+            return int(time.mktime(time.strptime(m, "%Y%m%d_%H%M%S")) * 1000)
+        except (ValueError, OverflowError):
+            return None
 
     # ---------- 保留 N 天清理 ----------
     def _janitor_loop(self) -> None:

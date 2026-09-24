@@ -10,14 +10,20 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// start 从文件名 YYYYMMDD_HHMMSS(本地时区)解析, 时长 = meta.file_hours(小时)
+// 时间以后端落库的 meta.file_start/file_end(毫秒, 墙钟)为准, 不解析文件名;
+// 旧记录(早期版本)无该字段时回退文件名解析
 function parseLapse(ev) {
   if (!ev.meta || !ev.meta.lapse_path) return null;
+  const start = Number(ev.meta.file_start);
+  const end = Number(ev.meta.file_end);
+  if (start > 0 && end > start) {
+    return { ev, cam: ev.camera_id, start, end, dur: end - start };
+  }
   const m = ev.meta.lapse_path.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.mp4$/);
   if (!m) return null;
-  const start = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
+  const s = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
   const hours = Number(ev.meta.file_hours) || 4;
-  return { ev, cam: ev.camera_id, start, end: start + hours * 3600 * 1000, dur: hours * 3600 * 1000 };
+  return { ev, cam: ev.camera_id, start: s, end: s + hours * 3600 * 1000, dur: hours * 3600 * 1000 };
 }
 
 function fmtHM(ms) {
