@@ -12,6 +12,7 @@ ANALYSIS_HISTORY_FILE = DATA_DIR / "analysis_history.json"
 ORDER_HISTORY_FILE = DATA_DIR / "order_history.json"
 MARKET_ANALYSIS_FILE = DATA_DIR / "market_analysis.json"
 CHAT_HISTORY_FILE = DATA_DIR / "chat_history.json"
+WATCHLIST_FILE = DATA_DIR / "watchlist.json"
 
 
 class AIConfig(BaseModel):

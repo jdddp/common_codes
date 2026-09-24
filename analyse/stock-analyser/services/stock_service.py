@@ -1,8 +1,8 @@
 import json
 from datetime import datetime
-from typing import List
-from models.portfolio import Portfolio, StockHolding
-from config import PORTFOLIO_FILE, ANALYSIS_HISTORY_FILE, ORDER_HISTORY_FILE, CHAT_HISTORY_FILE
+from typing import List, Optional
+from models.portfolio import Portfolio, StockHolding, WatchlistStock
+from config import PORTFOLIO_FILE, ANALYSIS_HISTORY_FILE, ORDER_HISTORY_FILE, CHAT_HISTORY_FILE, WATCHLIST_FILE
 
 
 def _load_json(path) -> dict:
@@ -24,18 +24,27 @@ class PortfolioService:
         portfolio.updated_at = datetime.now().isoformat()
         _save_json(PORTFOLIO_FILE, portfolio.model_dump())
 
-    def add_holding(self, holding: StockHolding) -> Portfolio:
+    def add_holding(self, holding: StockHolding, with_commission: bool = False) -> Portfolio:
         p = self.load()
+        amount = holding.cost_price * holding.quantity
+        if with_commission:
+            commission = p.calc_commission(amount)
+            total_cost_with_fee = amount + commission
+        else:
+            commission = 0
+            total_cost_with_fee = amount
+
         existing = p.get_holding(holding.code)
         if existing:
-            total_qty = existing.quantity + holding.quantity
-            existing.cost_price = (
-                existing.cost_price * existing.quantity
-                + holding.cost_price * holding.quantity
-            ) / total_qty
-            existing.quantity = total_qty
+            old_total = existing.cost_price * existing.quantity
+            existing.quantity += holding.quantity
+            existing.cost_price = (old_total + total_cost_with_fee) / existing.quantity
         else:
+            holding.cost_price = total_cost_with_fee / holding.quantity
             p.holdings.append(holding)
+
+        if with_commission:
+            p.available_funds -= total_cost_with_fee
         self.save(p)
         return p
 
@@ -82,6 +91,57 @@ class PortfolioService:
                 p.holdings.append(h)
         self.save(p)
         return p
+
+    def sell_holding(self, code: str, quantity: int, sell_price: float) -> Portfolio:
+        p = self.load()
+        h = p.get_holding(code)
+        if not h:
+            raise ValueError(f"未找到持仓: {code}")
+        if quantity > h.quantity:
+            raise ValueError(f"卖出数量({quantity})超过持仓数量({h.quantity})")
+
+        amount = sell_price * quantity
+        commission = p.calc_commission(amount)
+        net_proceeds = amount - commission
+
+        if quantity == h.quantity:
+            p.holdings = [x for x in p.holdings if x.code != code]
+        else:
+            h.cost_price = (h.cost_price * h.quantity - sell_price * quantity) / (h.quantity - quantity)
+            h.quantity -= quantity
+
+        p.available_funds += net_proceeds
+        self.save(p)
+        return p
+
+
+class WatchlistService:
+    def load(self) -> List[WatchlistStock]:
+        data = _load_json(WATCHLIST_FILE)
+        return [WatchlistStock(**s) for s in data.get("stocks", [])]
+
+    def save(self, stocks: List[WatchlistStock]):
+        _save_json(WATCHLIST_FILE, {"stocks": [s.model_dump() for s in stocks]})
+
+    def add(self, stock: WatchlistStock) -> List[WatchlistStock]:
+        stocks = self.load()
+        if any(s.code == stock.code for s in stocks):
+            raise ValueError(f"自选股已存在: {stock.code}")
+        stocks.append(stock)
+        self.save(stocks)
+        return stocks
+
+    def remove(self, code: str) -> List[WatchlistStock]:
+        stocks = self.load()
+        stocks = [s for s in stocks if s.code != code]
+        self.save(stocks)
+        return stocks
+
+    def get(self, code: str) -> Optional[WatchlistStock]:
+        for s in self.load():
+            if s.code == code:
+                return s
+        return None
 
 
 class AnalysisHistoryService:

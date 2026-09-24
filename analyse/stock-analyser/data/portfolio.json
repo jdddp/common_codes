@@ -3,32 +3,43 @@
     {
       "code": "000963",
       "name": "华东医药",
-      "quantity": 700,
-      "cost_price": 27.801,
-      "current_price": 26.63,
-      "sector": null,
-      "notes": null
-    },
-    {
-      "code": "002230",
-      "name": "科大讯飞",
-      "quantity": 200,
-      "cost_price": 39.069,
-      "current_price": 39.14,
+      "quantity": 600,
+      "cost_price": 27.968333333333334,
+      "current_price": 26.07,
       "sector": null,
       "notes": null
     },
     {
       "code": "600236",
       "name": "桂冠电力",
-      "quantity": 300,
-      "cost_price": 9.76,
-      "current_price": 9.41,
+      "quantity": 500,
+      "cost_price": 9.8084,
+      "current_price": 9.25,
+      "sector": null,
+      "notes": null
+    },
+    {
+      "code": "603993",
+      "name": "洛阳钼业",
+      "quantity": 400,
+      "cost_price": 17.723,
+      "current_price": 17.08,
+      "sector": null,
+      "notes": null
+    },
+    {
+      "code": "600330",
+      "name": "天通股份",
+      "quantity": 100,
+      "cost_price": 29.95,
+      "current_price": 28.56,
       "sector": null,
       "notes": null
     }
   ],
   "total_assets": 33748.52,
-  "available_funds": 0.0,
-  "updated_at": "2026-09-22T14:26:09.361682"
+  "available_funds": 4956.489999999998,
+  "commission_rate": 0.00025,
+  "min_commission": 5.0,
+  "updated_at": "2026-09-24T14:56:04.956654"
 }

@@ -12,8 +12,8 @@ from typing import Optional, List
 from contextlib import asynccontextmanager
 
 from config import load_config, save_config, STRATEGIES, load_market_analysis, save_market_analysis, MarketAnalysisState
-from models.portfolio import StockHolding, Portfolio
-from services.stock_service import PortfolioService, AnalysisHistoryService, OrderHistoryService, ChatHistoryService
+from models.portfolio import StockHolding, Portfolio, SellRequest, WatchlistStock
+from services.stock_service import PortfolioService, AnalysisHistoryService, OrderHistoryService, ChatHistoryService, WatchlistService
 from services.analysis_service import AnalysisService
 from price_updater import price_updater
 
@@ -36,6 +36,7 @@ portfolio_svc = PortfolioService()
 history_svc = AnalysisHistoryService()
 order_svc = OrderHistoryService()
 chat_history_svc = ChatHistoryService()
+watchlist_svc = WatchlistService()
 analysis_svc = AnalysisService()
 
 
@@ -66,6 +67,11 @@ class UpdateTotalAssetsRequest(BaseModel):
     total_assets: float
 
 
+class CommissionConfigRequest(BaseModel):
+    commission_rate: Optional[float] = None
+    min_commission: Optional[float] = None
+
+
 class AnalysisRequest(BaseModel):
     stock_code: str
     market_analysis: str
@@ -73,7 +79,8 @@ class AnalysisRequest(BaseModel):
 
 class BatchAnalysisRequest(BaseModel):
     market_analysis: str
-    stock_codes: Optional[List[str]] = None  # None表示分析全部持仓
+    stock_codes: Optional[List[str]] = None
+    include_watchlist: Optional[bool] = False
 
 
 class ChatRequest(BaseModel):
@@ -100,6 +107,14 @@ class MarketAnalysisRequest(BaseModel):
     market_analysis: str
 
 
+class WatchlistRequest(BaseModel):
+    code: str
+    name: str
+    current_price: Optional[float] = None
+    sector: Optional[str] = None
+    notes: Optional[str] = None
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -108,21 +123,24 @@ async def index(request: Request):
 @app.get("/portfolio")
 async def get_portfolio():
     p = portfolio_svc.load()
+    mv = p.total_market_value()
     return {
         "holdings": [h.model_dump() for h in p.holdings],
-        "total_assets": p.total_assets,
+        "total_assets": p.available_funds + mv,
         "available_funds": p.calc_available_funds(),
-        "total_market_value": p.total_market_value(),
+        "total_market_value": mv,
         "total_cost": p.total_cost(),
         "total_profit": p.total_profit(),
         "profit_pct": p.profit_pct(),
+        "commission_rate": p.commission_rate,
+        "min_commission": p.min_commission,
     }
 
 
 @app.post("/portfolio/holding")
-async def add_holding(req: AddHoldingRequest):
+async def add_holding(req: AddHoldingRequest, buy: bool = False):
     holding = StockHolding(**req.model_dump())
-    p = portfolio_svc.add_holding(holding)
+    p = portfolio_svc.add_holding(holding, with_commission=buy)
     return {"message": "持仓已添加", "holdings_count": len(p.holdings)}
 
 
@@ -136,6 +154,23 @@ async def update_holding(code: str, req: UpdateHoldingRequest):
 async def remove_holding(code: str):
     portfolio_svc.remove_holding(code)
     return {"message": "持仓已删除"}
+
+
+@app.post("/portfolio/holding/{code}/sell")
+async def sell_holding(code: str, req: SellRequest):
+    try:
+        p = portfolio_svc.sell_holding(code, req.quantity, req.sell_price)
+        amount = req.sell_price * req.quantity
+        commission = max(amount * p.commission_rate, p.min_commission)
+        return {
+            "message": f"已卖出 {code} {req.quantity}股，成交价 {req.sell_price}，手续费 {commission:.2f}元",
+            "holdings": [h.model_dump() for h in p.holdings],
+            "available_funds": p.calc_available_funds(),
+            "total_market_value": p.total_market_value(),
+            "commission": commission,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/portfolio/funds")
@@ -154,11 +189,53 @@ async def update_total_assets(req: UpdateTotalAssetsRequest):
     }
 
 
+@app.get("/portfolio/commission")
+async def get_commission():
+    p = portfolio_svc.load()
+    return {
+        "commission_rate": p.commission_rate,
+        "min_commission": p.min_commission,
+    }
+
+
+@app.post("/portfolio/commission")
+async def update_commission(req: CommissionConfigRequest):
+    p = portfolio_svc.load()
+    if req.commission_rate is not None:
+        p.commission_rate = req.commission_rate
+    if req.min_commission is not None:
+        p.min_commission = req.min_commission
+    portfolio_svc.save(p)
+    return {"message": "手续费配置已更新"}
+
+
 @app.post("/portfolio/import")
 async def import_holdings(holdings: List[AddHoldingRequest]):
     items = [StockHolding(**h.model_dump()) for h in holdings]
     p = portfolio_svc.import_batch(items)
     return {"message": f"已导入 {len(items)} 条持仓", "total": len(p.holdings)}
+
+
+@app.get("/portfolio/watchlist")
+async def get_watchlist():
+    stocks = watchlist_svc.load()
+    return {"stocks": [s.model_dump() for s in stocks]}
+
+
+@app.post("/portfolio/watchlist")
+async def add_to_watchlist(req: WatchlistRequest):
+    try:
+        stock = WatchlistStock(**req.model_dump())
+        watchlist_svc.add(stock)
+        return {"message": f"已添加自选股: {stock.code} {stock.name}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/portfolio/watchlist/{code}")
+async def remove_from_watchlist(code: str):
+    watchlist_svc.remove(code)
+    return {"message": f"已移除自选股: {code}"}
 
 
 @app.get("/market-analysis")
@@ -195,7 +272,7 @@ async def analyze(req: AnalysisRequest):
 @app.post("/analysis/batch")
 async def analyze_batch(req: BatchAnalysisRequest):
     try:
-        results = await analysis_svc.analyze_all(req.market_analysis, req.stock_codes)
+        results = await analysis_svc.analyze_all(req.market_analysis, req.stock_codes, req.include_watchlist)
         return {"results": [r.model_dump() for r in results]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"批量分析失败: {str(e)}")

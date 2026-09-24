@@ -157,10 +157,43 @@
             可用资金 = 总资产 - 持仓市值
         </div>
     </div>
+
+    <div class="card">
+        <h3>手续费设置</h3>
+        <div class="form-row">
+            <div class="form-group" style="max-width:200px">
+                <label>费率(万分之)</label>
+                <input id="commission-rate" type="number" step="0.01" placeholder="如2.5表示万2.5">
+            </div>
+            <div class="form-group" style="max-width:200px">
+                <label>最低手续费(元)</label>
+                <input id="min-commission" type="number" step="0.01" placeholder="如5">
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:8px">
+                <button class="btn btn-primary" onclick="updateCommission()">保存手续费</button>
+                <span id="commission-status" style="font-size:12px;color:#66bb6a"></span>
+            </div>
+        </div>
+        <div style="margin-top:8px;font-size:13px;color:#888">
+            实际手续费 = max(成交金额 × 费率, 最低手续费)
+        </div>
+    </div>
     
     <div class="card">
         <h3>持仓列表</h3>
         <div id="holdings-table"></div>
+    </div>
+
+    <div class="card">
+        <h3>自选股</h3>
+        <div class="form-row">
+            <div class="form-group"><label>股票代码</label><input id="w-code" placeholder="如 600519"></div>
+            <div class="form-group"><label>股票名称</label><input id="w-name" placeholder="如 贵州茅台"></div>
+            <div class="form-group"><label>当前价(可选)</label><input id="w-price" type="number" step="0.01"></div>
+            <div class="form-group"><label>板块(可选)</label><input id="w-sector" placeholder="如 白酒"></div>
+        </div>
+        <button class="btn btn-primary" onclick="addToWatchlist()">添加自选</button>
+        <div id="watchlist-table" style="margin-top:12px"></div>
     </div>
 </div>
 
@@ -186,9 +219,12 @@
                 <label>单只分析（选择股票）</label>
                 <select id="a-stock"></select>
             </div>
-            <div style="display:flex;align-items:flex-end;gap:8px">
+            <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap">
                 <button class="btn btn-primary" onclick="runAnalysis()">分析单只</button>
                 <button class="btn btn-success" onclick="runBatchAnalysis()">一键分析全部持仓</button>
+                <label style="font-size:12px;color:#888;display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="checkbox" id="include-watchlist"> 纳入自选股
+                </label>
             </div>
         </div>
     </div>
@@ -299,6 +335,52 @@
     </div>
 </div>
 
+<dialog id="sell-modal" style="background:#1a1a1a;color:#e0e0e0;border:1px solid #444;border-radius:12px;padding:0;max-width:400px;width:90%">
+    <div style="padding:24px">
+        <h3 style="color:#4fc3f7;margin-bottom:16px">卖出股票</h3>
+        <div style="font-size:13px;color:#888;margin-bottom:16px">
+            <div>股票: <span id="sell-info" style="color:#fff"></span></div>
+            <div>持有: <span id="sell-held-qty" style="color:#fff"></span>股 | 成本: <span id="sell-cost" style="color:#fff"></span>元</div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+            <label>卖出数量(股)</label>
+            <input id="sell-qty" type="number" min="1" step="100" placeholder="100的整数倍">
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+            <label>卖出价格(元)</label>
+            <input id="sell-price" type="number" step="0.01" placeholder="成交价">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="document.getElementById('sell-modal').close()">取消</button>
+            <button class="btn btn-danger" onclick="submitSell()">确认卖出</button>
+        </div>
+    </div>
+</dialog>
+
+<dialog id="buy-modal" style="background:#1a1a1a;color:#e0e0e0;border:1px solid #444;border-radius:12px;padding:0;max-width:400px;width:90%">
+    <div style="padding:24px">
+        <h3 style="color:#66bb6a;margin-bottom:16px">加仓买入</h3>
+        <div style="font-size:13px;color:#888;margin-bottom:16px">
+            <div>股票: <span id="buy-info" style="color:#fff"></span></div>
+            <div>持有: <span id="buy-held-qty" style="color:#fff"></span>股 | 成本: <span id="buy-cost" style="color:#fff"></span>元</div>
+            <div>可用资金: <span id="buy-funds" style="color:#66bb6a"></span>元</div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+            <label>买入数量(股)</label>
+            <input id="buy-qty" type="number" min="100" step="100" placeholder="100的整数倍" oninput="updateBuyPreview()">
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+            <label>买入价格(元)</label>
+            <input id="buy-price" type="number" step="0.01" placeholder="成交价" oninput="updateBuyPreview()">
+        </div>
+        <div id="buy-preview" style="font-size:12px;color:#888;margin-bottom:16px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="document.getElementById('buy-modal').close()">取消</button>
+            <button class="btn btn-success" onclick="submitBuy()">确认买入</button>
+        </div>
+    </div>
+</dialog>
+
 <script>
 const API = '';
 let portfolioData = null;
@@ -348,10 +430,12 @@ async function loadPortfolio() {
         const pct = ((price - h.cost_price) / h.cost_price * 100).toFixed(2);
         html += `<tr>
             <td>${h.code}</td><td>${h.name}</td><td>${h.quantity}</td>
-            <td>${h.cost_price.toFixed(2)}</td><td>${price.toFixed(2)}</td>
+            <td>${h.cost_price.toFixed(3)}</td><td>${price.toFixed(3)}</td>
             <td class="${profit >= 0 ? 'trend-up' : 'trend-down'}">${fmt(profit)} (${pct}%)</td>
-            <td><button class="btn btn-secondary" onclick="updatePrice('${h.code}', ${price})">更新价</button> 
-            <button class="btn btn-danger" onclick="removeHolding('${h.code}')">删除</button></td>
+            <td><button class="btn btn-success" onclick="openBuyModal('${h.code}','${h.name}',${h.quantity},${h.cost_price})" style="font-size:12px;padding:4px 10px">买入</button> 
+            <button class="btn btn-primary" onclick="openSellModal('${h.code}','${h.name}',${h.quantity},${h.cost_price})" style="font-size:12px;padding:4px 10px">卖出</button> 
+            <button class="btn btn-secondary" onclick="updatePrice('${h.code}', ${price})" style="font-size:12px;padding:4px 10px">更新价</button> 
+            <button class="btn btn-danger" onclick="removeHolding('${h.code}')" style="font-size:12px;padding:4px 10px">删除</button></td>
         </tr>`;
     }
     html += '</table>';
@@ -398,11 +482,143 @@ async function updatePrice(code, price) {
     loadPortfolio();
 }
 
+let sellCode = '';
+function openSellModal(code, name, heldQty, costPrice) {
+    sellCode = code;
+    document.getElementById('sell-info').textContent = `${code} ${name}`;
+    document.getElementById('sell-held-qty').textContent = heldQty;
+    document.getElementById('sell-cost').textContent = costPrice.toFixed(3);
+    document.getElementById('sell-qty').value = '';
+    document.getElementById('sell-price').value = '';
+    document.getElementById('sell-modal').showModal();
+}
+
+async function submitSell() {
+    const qty = parseInt(document.getElementById('sell-qty').value);
+    const price = parseFloat(document.getElementById('sell-price').value);
+    if (!qty || qty <= 0 || !price || price <= 0) return alert('请输入有效的数量和价格');
+    try {
+        const data = await api('POST', `/portfolio/holding/${sellCode}/sell`, { quantity: qty, sell_price: price });
+        if (data.detail) throw new Error(data.detail);
+        document.getElementById('sell-modal').close();
+        alert(`卖出成功: ${data.message}`);
+        loadPortfolio();
+    } catch(e) {
+        alert('卖出失败: ' + e.message);
+    }
+}
+
+let buyCode = '';
+function openBuyModal(code, name, heldQty, costPrice) {
+    buyCode = code;
+    document.getElementById('buy-info').textContent = `${code} ${name}`;
+    document.getElementById('buy-held-qty').textContent = heldQty;
+    document.getElementById('buy-cost').textContent = costPrice.toFixed(3);
+    document.getElementById('buy-funds').textContent = (portfolioData?.available_funds || 0).toFixed(2);
+    document.getElementById('buy-qty').value = '';
+    document.getElementById('buy-price').value = '';
+    document.getElementById('buy-preview').textContent = '';
+    document.getElementById('buy-modal').showModal();
+}
+
+function updateBuyPreview() {
+    const qty = parseInt(document.getElementById('buy-qty').value) || 0;
+    const price = parseFloat(document.getElementById('buy-price').value) || 0;
+    if (qty > 0 && price > 0) {
+        const amount = qty * price;
+        const commission = Math.max(amount * (portfolioData?.commission_rate || 0.00025), portfolioData?.min_commission || 5);
+        const total = amount + commission;
+        document.getElementById('buy-preview').innerHTML = `成交金额: ${amount.toFixed(2)}元 | 手续费: ${commission.toFixed(2)}元 | <span style="color:${total > (portfolioData?.available_funds || 0) ? '#ef5350' : '#66bb6a'}">总支出: ${total.toFixed(2)}元</span>`;
+    }
+}
+
+async function submitBuy() {
+    const qty = parseInt(document.getElementById('buy-qty').value);
+    const price = parseFloat(document.getElementById('buy-price').value);
+    if (!qty || qty <= 0 || !price || price <= 0) return alert('请输入有效的数量和价格');
+    try {
+        const data = await api('POST', '/portfolio/holding?buy=true', { code: buyCode, name: document.getElementById('buy-info').textContent.replace(buyCode + ' ', ''), quantity: qty, cost_price: price });
+        if (data.detail) throw new Error(data.detail);
+        document.getElementById('buy-modal').close();
+        alert('买入成功');
+        loadPortfolio();
+    } catch(e) {
+        alert('买入失败: ' + e.message);
+    }
+}
+
+async function addToWatchlist() {
+    const code = document.getElementById('w-code').value.trim();
+    const name = document.getElementById('w-name').value.trim();
+    if (!code || !name) return alert('请填写股票代码和名称');
+    const body = { code, name };
+    const p = document.getElementById('w-price').value;
+    if (p) body.current_price = parseFloat(p);
+    body.sector = document.getElementById('w-sector').value.trim() || null;
+    try {
+        const data = await api('POST', '/portfolio/watchlist', body);
+        if (data.detail) throw new Error(data.detail);
+        ['w-code','w-name','w-price','w-sector'].forEach(id => document.getElementById(id).value = '');
+        loadWatchlist();
+    } catch(e) {
+        alert('添加失败: ' + e.message);
+    }
+}
+
+async function removeFromWatchlist(code) {
+    if (!confirm(`确定移除自选股 ${code} ?`)) return;
+    await api('DELETE', `/portfolio/watchlist/${code}`);
+    loadWatchlist();
+}
+
+async function loadWatchlist() {
+    try {
+        const data = await api('GET', '/portfolio/watchlist');
+        const stocks = data?.stocks || [];
+        if (!stocks.length) {
+            document.getElementById('watchlist-table').innerHTML = '<div style="font-size:12px;color:#666">暂无自选股</div>';
+            return;
+        }
+        let html = '<table><tr><th>代码</th><th>名称</th><th>当前价</th><th>板块</th><th>操作</th></tr>';
+        for (const s of stocks) {
+            html += `<tr>
+                <td>${s.code}</td><td>${s.name}</td>
+                <td>${s.current_price ? s.current_price.toFixed(3) : '-'}</td>
+                <td>${s.sector || '-'}</td>
+                <td><button class="btn btn-danger" onclick="removeFromWatchlist('${s.code}')" style="font-size:12px;padding:4px 10px">移除</button></td>
+            </tr>`;
+        }
+        html += '</table>';
+        document.getElementById('watchlist-table').innerHTML = html;
+    } catch(e) {
+        document.getElementById('watchlist-table').innerHTML = '';
+    }
+}
+
 async function updateTotalAssets() {
     const val = parseFloat(document.getElementById('total-assets-input').value);
     if (isNaN(val) || val < 0) return alert('请输入有效的总资产金额');
-    await api('POST', '/portfolio/total-assets', { total_assets: val });
+    const mv = portfolioData?.total_market_value || 0;
+    await api('POST', '/portfolio/funds', { funds: Math.max(0, val - mv) });
     loadPortfolio();
+}
+
+async function loadCommission() {
+    try {
+        const data = await api('GET', '/portfolio/commission');
+        document.getElementById('commission-rate').value = (data.commission_rate * 10000).toFixed(2);
+        document.getElementById('min-commission').value = data.min_commission;
+    } catch(e) {}
+}
+
+async function updateCommission() {
+    const rate = parseFloat(document.getElementById('commission-rate').value);
+    const min = parseFloat(document.getElementById('min-commission').value);
+    if (isNaN(rate) || rate < 0 || isNaN(min) || min < 0) return alert('请输入有效的手续费参数');
+    await api('POST', '/portfolio/commission', { commission_rate: rate / 10000, min_commission: min });
+    const el = document.getElementById('commission-status');
+    el.textContent = '已保存';
+    setTimeout(() => el.textContent = '', 2000);
 }
 
 async function importJSON(event) {
@@ -427,6 +643,14 @@ async function loadStockSelect() {
         sel.innerHTML += `<option value="${h.code}">${h.code} ${h.name}</option>`;
         csel.innerHTML += `<option value="${h.code}">${h.code} ${h.name}</option>`;
     }
+    try {
+        const wdata = await api('GET', '/portfolio/watchlist');
+        for (const w of (wdata?.stocks || [])) {
+            const label = `[自选] ${w.code} ${w.name}`;
+            sel.innerHTML += `<option value="${w.code}">${label}</option>`;
+            csel.innerHTML += `<option value="${w.code}">${label}</option>`;
+        }
+    } catch(e) {}
 }
 
 async function runAnalysis() {
@@ -452,12 +676,13 @@ async function runBatchAnalysis() {
 
     const data = await api('GET', '/portfolio');
     const holdings = data?.holdings || [];
-    if (!holdings.length) return showMsg('暂无持仓，请先添加');
+    const includeWatchlist = document.getElementById('include-watchlist')?.checked || false;
+    if (!holdings.length && !includeWatchlist) return showMsg('暂无持仓或自选股，请先添加');
 
     document.getElementById('analysis-result').innerHTML = `<div class="loading">联网批量分析中，通常需要1-3分钟，请耐心等待...</div>`;
     
     try {
-        const result = await api('POST', '/analysis/batch', { market_analysis: market });
+        const result = await api('POST', '/analysis/batch', { market_analysis: market, include_watchlist: includeWatchlist });
         if (result.detail) throw new Error(result.detail);
         
         const results = result.results || [];
@@ -866,6 +1091,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStockSelect();
     loadHistory();
     loadMarketAnalysis();
+    loadWatchlist();
+    loadCommission();
     setInterval(loadPriceStatus, 30000);
     setInterval(() => {
         if (document.getElementById('tab-portfolio').classList.contains('active')) {

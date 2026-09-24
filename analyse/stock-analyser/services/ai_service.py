@@ -88,7 +88,7 @@ USER_PROMPT_TEMPLATE = """请根据以下信息，分析该个股并生成交易
   "risk_warning": ["风险1", "风险2", "风险3"]
 }}"""
 
-BATCH_SYSTEM_PROMPT = """你是一个专业的A股股票分析师，擅长根据大盘复盘和实时走势批量分析多只持仓股票。
+BATCH_SYSTEM_PROMPT = """你是一个专业的A股股票分析师，擅长根据大盘复盘和实时走势批量分析多只股票。
 
 分析场景（根据用户提供的信息判断）：
 1. **盘前/非交易时段**：用户提供的是复盘分析，你需要基于此预测次日走势并制定交易计划
@@ -97,7 +97,10 @@ BATCH_SYSTEM_PROMPT = """你是一个专业的A股股票分析师，擅长根据
 分析要求：
 1. **验证用户的大盘分析**：判断用户的分析是否准确、完整，指出遗漏或偏差
 2. **逐只分析**：每只股票需要独立分析，考虑其所属板块与大盘的联动性
-3. **给出操作建议**：结合持仓成本，给出具体的买入/卖出/持有建议
+3. **给出操作建议**：
+   - 对于持仓股（成本价>0，数量>0）：结合持仓成本，给出具体的买入/卖出/持有建议
+   - 对于自选股（成本价=0，数量=0）：给出买入建仓建议和计划，不要给出卖出建议
+4. **自选股特别说明**：自选股是用户关注但尚未买入的股票，请重点分析买入时机、建仓价位、目标价和止损价
 
 输出要求：
 - 返回一个JSON数组，每个元素对应一只股票的分析结果
@@ -106,7 +109,7 @@ BATCH_SYSTEM_PROMPT = """你是一个专业的A股股票分析师，擅长根据
 - 价格精确到小数点后2位
 - 数量为100的整数倍（1手=100股）"""
 
-BATCH_USER_PROMPT_TEMPLATE = """请根据以下信息，一次性分析全部持仓股票：
+BATCH_USER_PROMPT_TEMPLATE = """请根据以下信息，一次性分析全部股票：
 
 【持仓列表】
 {holdings_text}
@@ -118,7 +121,9 @@ BATCH_USER_PROMPT_TEMPLATE = """请根据以下信息，一次性分析全部持
 
 请完成以下任务：
 1. **验证用户的大盘分析**：用户的分析有哪些准确的地方？有哪些遗漏或需要补充的？
-2. **逐只分析**：每只股票需要独立分析，考虑其所属板块与大盘的联动性，结合持仓成本给出操作建议
+2. **逐只分析**：每只股票需要独立分析，考虑其所属板块与大盘的联动性
+   - 持仓股（成本价>0）：结合持仓成本给出操作建议
+   - 自选股（成本价=0）：给出买入建仓建议，不要给出卖出建议
 3. **给出后续关注点**：接下来需要关注什么？什么情况下需要调整策略？
 
 请按以下JSON数组格式输出（每只股票一个对象）：
@@ -156,17 +161,17 @@ BATCH_USER_PROMPT_TEMPLATE = """请根据以下信息，一次性分析全部持
 
 
 class AIService:
-    def __init__(self):
-        self.config = load_config()
+    def _get_config(self):
+        return load_config()
 
-    def _get_client(self) -> AsyncOpenAI:
+    def _get_client(self, cfg) -> AsyncOpenAI:
         return AsyncOpenAI(
-            api_key=self.config.ai.api_key,
-            base_url=self.config.ai.base_url,
+            api_key=cfg.ai.api_key,
+            base_url=cfg.ai.base_url,
         )
 
-    def _get_tools(self) -> list:
-        if not self.config.ai.enable_web_search:
+    def _get_tools(self, cfg) -> list:
+        if not cfg.ai.enable_web_search:
             return []
         return [
             {"type": "web_search"},
@@ -174,9 +179,9 @@ class AIService:
             # {"type": "code_interpreter"}
         ]
 
-    def _get_extra_body(self) -> dict:
+    def _get_extra_body(self, cfg) -> dict:
         body = {}
-        if self.config.ai.enable_thinking:
+        if cfg.ai.enable_thinking:
             body["enable_thinking"] = True
         return body
 
@@ -191,7 +196,8 @@ class AIService:
         market_analysis: str,
         history_context: str = "无",
     ) -> dict:
-        client = self._get_client()
+        cfg = self._get_config()
+        client = self._get_client(cfg)
 
         user_msg = USER_PROMPT_TEMPLATE.format(
             stock_code=stock_code,
@@ -207,10 +213,10 @@ class AIService:
         full_input = f"{SYSTEM_PROMPT}\n\n{user_msg}"
 
         response = await client.responses.create(
-            model=self.config.ai.model,
+            model=cfg.ai.model,
             input=full_input,
-            tools=self._get_tools(),
-            extra_body=self._get_extra_body(),
+            tools=self._get_tools(cfg),
+            extra_body=self._get_extra_body(cfg),
         )
 
         raw = response.output_text.strip()
@@ -239,15 +245,17 @@ class AIService:
         history_map: dict = None,
     ) -> list:
         """一次调用AI分析全部持仓，返回 list[dict]"""
-        client = self._get_client()
+        cfg = self._get_config()
+        client = self._get_client(cfg)
         history_map = history_map or {}
 
         lines = []
         for i, h in enumerate(holdings, 1):
             code = h['code']
             hist = history_map.get(code, "无")
+            tag = "【自选】" if h['cost_price'] == 0 and h['quantity'] == 0 else "【持仓】"
             lines.append(
-                f"{i}. {code} {h['name']}\n"
+                f"{i}. {tag} {code} {h['name']}\n"
                 f"   当前价: {h['current_price']}元  成本价: {h['cost_price']}元  数量: {h['quantity']}股\n"
                 f"   历史参考: {hist}"
             )
@@ -261,10 +269,10 @@ class AIService:
         full_input = f"{BATCH_SYSTEM_PROMPT}\n\n{user_msg}"
 
         response = await client.responses.create(
-            model=self.config.ai.model,
+            model=cfg.ai.model,
             input=full_input,
-            tools=self._get_tools(),
-            extra_body=self._get_extra_body(),
+            tools=self._get_tools(cfg),
+            extra_body=self._get_extra_body(cfg),
         )
 
         raw = response.output_text.strip()
@@ -286,7 +294,8 @@ class AIService:
         return result
 
     async def chat(self, message: str, context: str = "") -> str:
-        client = self._get_client()
+        cfg = self._get_config()
+        client = self._get_client(cfg)
         system = """你是一个专业的A股股票分析师助手，拥有丰富的实战经验。
 
 回答要求：
@@ -297,7 +306,7 @@ class AIService:
 5. 总字数控制在300字以内，不要展开解释，不要重复用户的问题
 
 回答格式：
-- 用markdown格式，层次清晰,段落间分行一行
+- 用markdown格式，层次清晰,段落间不要空行
 - 关键数据用列表或加粗展示"""
 
         if context:
@@ -306,9 +315,9 @@ class AIService:
         full_input = f"{system}\n\n{message}"
 
         response = await client.responses.create(
-            model=self.config.ai.model,
+            model=cfg.ai.model,
             input=full_input,
-            tools=self._get_tools(),
-            extra_body=self._get_extra_body(),
+            tools=self._get_tools(cfg),
+            extra_body=self._get_extra_body(cfg),
         )
         return response.output_text.strip()

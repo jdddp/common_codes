@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from services.stock_service import PortfolioService, AnalysisHistoryService, ChatHistoryService
+from services.stock_service import PortfolioService, AnalysisHistoryService, ChatHistoryService, WatchlistService
 from services.ai_service import AIService
 from services.order_service import parse_analysis_response
 from models.analysis import (
@@ -18,6 +18,7 @@ class AnalysisService:
         self.portfolio_svc = PortfolioService()
         self.history_svc = AnalysisHistoryService()
         self.chat_history_svc = ChatHistoryService()
+        self.watchlist_svc = WatchlistService()
         self.ai_svc = AIService()
 
     def _get_market_analysis_context(self) -> str:
@@ -85,8 +86,14 @@ class AnalysisService:
     ) -> AnalysisResult:
         portfolio = self.portfolio_svc.load()
         holding = portfolio.get_holding(stock_code)
+
+        is_watchlist = False
+        watchlist_stock = None
         if not holding:
-            raise ValueError(f"未找到持仓: {stock_code}")
+            watchlist_stock = self.watchlist_svc.get(stock_code)
+            if not watchlist_stock:
+                raise ValueError(f"未找到持仓或自选股: {stock_code}")
+            is_watchlist = True
 
         records = self.history_svc.get_by_stock(stock_code, limit=3)
         history_ctx = "无"
@@ -102,29 +109,42 @@ class AnalysisService:
         market_ctx = self._get_market_analysis_context()
         final_market_analysis = market_analysis + market_ctx
 
+        if is_watchlist:
+            stock_code_val = watchlist_stock.code
+            stock_name_val = watchlist_stock.name
+            current_price_val = watchlist_stock.current_price or 0
+            cost_price_val = 0
+            quantity_val = 0
+        else:
+            stock_code_val = holding.code
+            stock_name_val = holding.name
+            current_price_val = holding.current_price or holding.cost_price
+            cost_price_val = holding.cost_price
+            quantity_val = holding.quantity
+
         raw = await self.ai_svc.analyze(
-            stock_code=holding.code,
-            stock_name=holding.name,
-            current_price=holding.current_price or holding.cost_price,
-            cost_price=holding.cost_price,
-            quantity=holding.quantity,
-            available_funds=portfolio.available_funds,
+            stock_code=stock_code_val,
+            stock_name=stock_name_val,
+            current_price=current_price_val,
+            cost_price=cost_price_val,
+            quantity=quantity_val,
+            available_funds=portfolio.calc_available_funds(),
             market_analysis=final_market_analysis,
             history_context=history_ctx,
         )
 
         result = parse_analysis_response(
             data=raw,
-            stock_code=holding.code,
-            stock_name=holding.name,
-            current_price=holding.current_price or holding.cost_price,
-            cost_price=holding.cost_price,
-            quantity=holding.quantity,
+            stock_code=stock_code_val,
+            stock_name=stock_name_val,
+            current_price=current_price_val,
+            cost_price=cost_price_val,
+            quantity=quantity_val,
         )
         result.analysis_date = datetime.now().strftime("%Y-%m-%d")
 
         self.history_svc.save_record(
-            self._build_history_record(result, holding.code, holding.name, market_analysis)
+            self._build_history_record(result, stock_code_val, stock_name_val, market_analysis)
         )
 
         return result
@@ -133,17 +153,19 @@ class AnalysisService:
         self,
         market_analysis: str,
         stock_codes: Optional[List[str]] = None,
+        include_watchlist: bool = False,
     ) -> List[AnalysisResult]:
         portfolio = self.portfolio_svc.load()
         holdings = portfolio.holdings
         if stock_codes:
             holdings = [h for h in holdings if h.code in stock_codes]
 
-        holdings_data = []
+        all_items = []
         history_map = {}
+
         for h in holdings:
             price = h.current_price or h.cost_price
-            holdings_data.append({
+            all_items.append({
                 "code": h.code,
                 "name": h.name,
                 "current_price": price,
@@ -159,12 +181,25 @@ class AnalysisService:
                 ]
                 history_map[h.code] = "\n".join(lines)
 
+        if include_watchlist:
+            watchlist_stocks = self.watchlist_svc.load()
+            holding_codes = {h.code for h in holdings}
+            for ws in watchlist_stocks:
+                if ws.code not in holding_codes:
+                    all_items.append({
+                        "code": ws.code,
+                        "name": ws.name,
+                        "current_price": ws.current_price or 0,
+                        "cost_price": 0,
+                        "quantity": 0,
+                    })
+
         market_ctx = self._get_market_analysis_context()
         final_market_analysis = market_analysis + market_ctx
 
         try:
             raw_results = await self.ai_svc.analyze_batch(
-                holdings=holdings_data,
+                holdings=all_items,
                 available_funds=portfolio.calc_available_funds(),
                 market_analysis=final_market_analysis,
                 history_map=history_map,
@@ -172,38 +207,38 @@ class AnalysisService:
         except Exception as e:
             return [
                 AnalysisResult(
-                    stock_code=h.code,
-                    stock_name=h.name,
-                    current_price=h.current_price or h.cost_price,
+                    stock_code=item["code"],
+                    stock_name=item["name"],
+                    current_price=item["current_price"] or item["cost_price"],
                     analysis_date=datetime.now().strftime("%Y-%m-%d"),
                     market_analysis=MarketAnalysis(trend="分析失败", summary=str(e)),
                     prediction=Prediction(
                         next_day_trend="未知", confidence=0,
-                        target_price=h.current_price or h.cost_price,
-                        stop_loss=h.current_price or h.cost_price,
+                        target_price=item["current_price"] or item["cost_price"],
+                        stop_loss=item["current_price"] or item["cost_price"],
                     ),
                     operation_suggestion=OperationSuggestion(action="无法分析", reason=str(e)),
                     order_plan=OrderPlan(strategy="无", total_position_pct=0, orders=[]),
                     risk_warning=[f"分析失败: {str(e)}"],
                 )
-                for h in holdings
+                for item in all_items
             ]
 
         results = []
-        for raw, holding in zip(raw_results, holdings):
+        for raw, item in zip(raw_results, all_items):
             result = parse_analysis_response(
                 data=raw,
-                stock_code=holding.code,
-                stock_name=holding.name,
-                current_price=holding.current_price or holding.cost_price,
-                cost_price=holding.cost_price,
-                quantity=holding.quantity,
+                stock_code=item["code"],
+                stock_name=item["name"],
+                current_price=item["current_price"] or item["cost_price"],
+                cost_price=item["cost_price"],
+                quantity=item["quantity"],
             )
             result.analysis_date = datetime.now().strftime("%Y-%m-%d")
             results.append(result)
 
             self.history_svc.save_record(
-                self._build_history_record(result, holding.code, holding.name, market_analysis)
+                self._build_history_record(result, item["code"], item["name"], market_analysis)
             )
 
         return results
