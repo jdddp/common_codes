@@ -29,7 +29,7 @@ plugins: &person_plugins
       device: "cpu"                    # or "gpu"
       weightPath: "./backend/plugins/yolo26n.onnx" #"./models/cy_v20713.onnx"
       img_size: 640                     # 输入图像尺寸
-      conf_threshold: 0.1              # 检测置信度阈值
+      conf_threshold: 0.2              # 检测置信度阈值
       classes: ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush']
       conf_list: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
       visible_classes: ["person"] #["cy", "yq", "zl", 'yq2']  # 只显示这些类别
@@ -61,7 +61,7 @@ plugins: &person_plugins
 # 每路: camera_id 唯一; rtsp_url 填本地视频会循环模拟 IP 摄像头;
 #       plugins 可选, 缺省该路仅供流不检测
 cameras:
-  - camera_id: "main"
+  - camera_id: "客厅"
     rtsp_url: "data/aa632867bcb79c54194e0cb63d43d882.mp4"
     # 断开后重连间隔(秒), 随失败次数指数退避到 max_reconnect_delay
     reconnect_delay: 2
@@ -73,7 +73,7 @@ cameras:
     # 轻量手段: 低帧率 + CRF 压缩; 不建索引库(文件名即时间戳); 清理器按 mtime 删旧片
     lapse: &lapse_cfg
       enabled: true
-      file_hours: 1          # M = 每个文件存多少小时
+      file_hours: 0.05          # M = 每个文件存多少小时
       keep_days: 7           # N = 保留最近多少天
       fps: 8                 # 录像帧率(低=省 CPU/容量)
       crf: 27                # H.264 质量档(小=清晰, 大=省容量)

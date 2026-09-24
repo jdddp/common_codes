@@ -370,6 +370,7 @@ function openLightbox(src) {
   $("#lightbox").classList.remove("hidden");
 }
 
+
 // ---------- 实时画面暂停/继续 ----------
 function toggleLive() {
   STATE.livePaused = !STATE.livePaused;

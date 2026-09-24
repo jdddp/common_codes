@@ -159,6 +159,10 @@ class Storage:
         if kind:
             where.append("kind=?")
             args.append(kind)
+        else:
+            # 事件记录默认不包含持续录像(lapse); 回放页用 kind=lapse 显式查询
+            where.append("kind<>?")
+            args.append("lapse")
         if day:
             start_d = datetime.strptime(day, "%Y-%m-%d")
             end_d = start_d + timedelta(days=1)
@@ -181,12 +185,12 @@ class Storage:
             conn.close()
 
     def list_days(self, limit: int = 30) -> List[Dict]:
-        """按本地日期统计事件数的降序列表, 供前端"按天筛选"。"""
+        """按本地日期统计事件数的降序列表, 供前端"按天筛选"(持续录像不计)。"""
         conn = sqlite3.connect(self._db_path)
         try:
             rows = conn.execute(
                 "SELECT strftime('%Y-%m-%d', ts/1000.0, 'unixepoch', 'localtime') AS day, "
-                "COUNT(*) AS c FROM events GROUP BY day ORDER BY day DESC LIMIT ?",
+                "COUNT(*) AS c FROM events WHERE kind<>'lapse' GROUP BY day ORDER BY day DESC LIMIT ?",
                 (limit,),
             ).fetchall()
             return [{"day": r[0], "count": r[1]} for r in rows]

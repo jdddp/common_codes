@@ -291,4 +291,4 @@ plugins:
 | 7 | 信号扩展 | WS 信号含 `record_created` / `record_deleted`，前端/重连均同步 |
 | 8 | 多摄像头 | `cameras:` 列表配置，每路独立取流/插件/录像缓冲；`/cam/{id}/stream` + 前端切换条；插件跨摄像头独立启停 |
 | 9 | 浏览器可播录像 | OpenCV 只能产 MPEG-4 Part 2(浏览器播不了) → 改用系统 ffmpeg 编 H.264 Baseline(yuv420p+faststart)，缺失时回退 OpenCV |
-| 10 | 持续录像(实时存储) | `lapse` 与 `storage.lapse_dir`；每路常驻 ffmpeg 分片，`file_hours` 小时/段 H.264(低帧率+CRF)；文件名即时间戳不入视频索引库；`kind=lapse` 每片落库(重启去重)；monitor 按 mtime 冻结判定完成、janitor 按 `keep_days` 删旧，停机补录未落库分片；`/lapse/{camera_id}/{file}` 播放/下载，删除记录级联清文件 |
+| 10 | 持续录像(实时存储) | `lapse` 与 `storage.lapse_dir`；每路常驻 ffmpeg 分片，`file_hours` 小时/段 H.264(低帧率+CRF)；文件名即时间戳不入视频索引库；`kind=lapse` 每片落库(重启去重)；monitor 按 mtime 冻结判定完成、janitor 按 `keep_days` 删旧，停机补录未落库分片；`/lapse/{camera_id}/{file}` 播放/下载，删除记录级联清文件。独立回放页 `/playback`（时间轴逐块播放）；`lapse` 不计入事件记录/按天统计（`kind=lapse` 显式查询） |

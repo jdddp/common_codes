@@ -6,6 +6,7 @@
 ## 特性
 
 - **多摄像头**：每路独立取流/独立检测插件/独立录像缓冲，前端一键切换实时画面
+- **持续录像(实时存储)+ 回放**：每路可选 `lapse:` 配置（M 小时/段、保留 N 天），独立回放页 `/playback` 按摄像头分组**列表呈现**，每条可在线播放 + 下载；持续录像**不计入事件记录**
 - 实时画面（MJPEG 流），支持暂停/继续（按钮或 P 键）
 - 人员入侵检测插件（本地 ONNX YOLO，无需外网 API，每路摄像头可独立启停）
 - 事件保存**前后时间段录像**（环形缓冲 → ffmpeg 编码 H.264 Baseline + faststart，浏览器原生可直接播放），录像卡片可一键下载
@@ -73,7 +74,7 @@ cameras:
 | GET | /clips/{path} | 事件录像 mp4 |
 | GET | /lapse/{camera_id}/{filename} | 持续录像分片 mp4（播放/下载） |
 | GET | /api/status | 所有摄像头 + 插件状态（cameras 列表） |
-| GET | /api/events?after_id=&limit=&kind=&day= | 记录历史/增量（day=YYYY-MM-DD 按天过滤） |
+| GET | /api/events?after_id=&limit=&kind=&day= | 记录历史/增量（day=YYYY-MM-DD 按天过滤；默认不含持续录像，`kind=lapse` 显式查询） |
 | GET | /api/events/days | 按天分组的记录天数+计数 |
 | DELETE | /api/events/{id} | 删除记录（级联删同一事件段的关联记录+媒体文件） |
 | GET | /api/plugins | 所有摄像头的插件状态 |

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>录像回放 - Home AI</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Home AI <span class="sub">录像回放</span></h1>
+    <div class="status-strip">
+      <span class="pill" id="viz-status" data-status="connecting">数据加载中...</span>
+      <a class="nav-playback" href="/">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 5l-7 7 7 7"/>
+        </svg>
+        返回实时监控
+      </a>
+    </div>
+  </header>
+
+  <main class="play-page">
+    <section class="panel">
+      <div class="play-toolbar">
+        <label class="field">
+          <span class="field-label">日期</span>
+          <input type="date" id="play-date">
+        </label>
+        <button id="play-refresh" class="btn-mini" type="button">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
+            <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.4 10.6l-1.87-.7A6 6 0 1 1 12 6c1.6 0 3.05.62 4.12 1.63L13 11h7V4l-2.35 2.35Z"/>
+          </svg>
+          刷新
+        </button>
+        <span id="play-info" class="hint"></span>
+      </div>
+      <div id="play-cams" class="cam-bar"></div>
+    </section>
+
+    <section class="panel">
+      <div id="play-list" class="play-list"></div>
+    </section>
+  </main>
+
+  <script src="/static/playback.js"></script>
+</body>
+</html>

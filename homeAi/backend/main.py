@@ -87,6 +87,11 @@ async def index():
     return FileResponse(FRONTEND_DIR / "index.html")
 
 
+@app.get("/playback", include_in_schema=False)
+async def playback():
+    return FileResponse(FRONTEND_DIR / "playback.html")
+
+
 # ---------- MJPEG 实时流 ----------
 def _unit_or_404(camera_id: str = ""):
     cameras = app.state.cameras
