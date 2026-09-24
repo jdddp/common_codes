@@ -22,9 +22,9 @@ plugins: &person_plugins
       # 运动事件是否保存前后时间段录像
       record_video: true
       # 事件前保留秒数(来自 clips.buffer_sec 覆盖, 不能超过 buffer_sec)
-      pre_sec: 2
+      pre_sec: 3
       # 事件后继续录制秒数
-      post_sec: 3
+      post_sec: 5
       #model args
       device: "cpu"                    # or "gpu"
       weightPath: "./backend/plugins/yolo26n.onnx" #"./models/cy_v20713.onnx"
@@ -37,15 +37,14 @@ plugins: &person_plugins
       #最右侧 20% 作为“进入区域”
       entry_zone_ratio: 0.2
       # 至少向左移动 20 像素才认为真正进入
-      min_move_px: 20
+      min_move_px: 150
       # 目标最多允许丢失  帧
       max_track_age: 3
       # IoU 跟踪阈值
-      track_iou_threshold: 0.20
+      track_iou_threshold: 0.2
       # 中心点最大匹配距离
-      track_distance_ratio: 0.12
-      # 全局报警冷却
-      debounce_sec: 10
+      track_distance_ratio: 0.01
+
 
 # motion_entry: &motion_entry
 #   name: motion
@@ -62,7 +61,8 @@ plugins: &person_plugins
 #       plugins 可选, 缺省该路仅供流不检测
 cameras:
   - camera_id: "客厅"
-    rtsp_url: "data/aa632867bcb79c54194e0cb63d43d882.mp4"
+    rtsp_url: "rtsp://admin:admin@192.168.53.15/live/chn=0"
+    # rtsp_url: "data/aa632867bcb79c54194e0cb63d43d882.mp4"
     # 断开后重连间隔(秒), 随失败次数指数退避到 max_reconnect_delay
     reconnect_delay: 2
     max_reconnect_delay: 30
@@ -72,26 +72,26 @@ cameras:
     # 持续录像(实时存储): 每 M 小时一个 H.264 分片, 动态保留最近 N 天
     # 轻量手段: 低帧率 + CRF 压缩; 不建索引库(文件名即时间戳); 清理器按 mtime 删旧片
     lapse: &lapse_cfg
-      enabled: true
-      file_hours: 0.01          # M = 每个文件存多少小时
+      enabled: false
+      file_hours: 1          # M = 每个文件存多少小时
       keep_days: 5           # N = 保留最近多少天
       fps: 8                 # 录像帧率(低=省 CPU/容量)
       crf: 27                # H.264 质量档(小=清晰, 大=省容量)
 
-  - camera_id: "door"
-    rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
-    reconnect_delay: 2
-    max_reconnect_delay: 30
-    watchdog_timeout: 10
-    plugins: []
-    lapse: *lapse_cfg             # H.264 质量档(小=清晰, 大=省容量)
+  # - camera_id: "door"
+  #   rtsp_url: "data/25437e3eb9bb739783444b01b11396dc.mp4"
+  #   reconnect_delay: 2
+  #   max_reconnect_delay: 30
+  #   watchdog_timeout: 10
+  #   plugins: []
+  #   lapse: *lapse_cfg             # H.264 质量档(小=清晰, 大=省容量)
 
 # pipeline 全局默认(每路可在 cameras[i].pipeline 覆盖)
 pipeline:
   # 传给插件的帧间隔控制(帧率上限), 0 表示不限制
-  max_fps: 30
+  max_fps: 20
   # 缩放后再交给插件 (1 表示原图)
-  scale: 1
+  scale: 0.5
 
 storage:
   snapshot_dir: "data/snapshots"
@@ -103,8 +103,8 @@ storage:
 
 clips:
   # 事件前环形缓冲时长(秒)
-  buffer_sec: 15
+  buffer_sec: 5
   # 录像帧率
   fps: 12
   # 录像分辨率缩放
-  scale: 1
+  scale: 0.5
