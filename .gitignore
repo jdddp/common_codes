@@ -3,6 +3,7 @@
 /cpp库.zip
 /python/yolo/pt2rknn/onnx2rknn/rknn_quantitation/
 /python/yolo/pt2rknn/onnx2rknn/test/
+/python/hdy/
 *.rknn
 *.onnx
 *.png
