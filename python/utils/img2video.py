@@ -51,6 +51,6 @@ def images_to_video(image_folder, output_video, fps=2):
 #     image_folder = rf"D:\projects\20260511Unet\ganrao_qiuyuanzhuandong\{flag}_denoise"  # 替换为你的图片文件夹路径
 #     output_video = rf"D:\projects\20260511Unet\ganrao_qiuyuanzhuandong\video\{flag}_denoise.mp4"
 #     images_to_video(image_folder, output_video)
-image_folder='/home/poly/jzp/kgr/ans'
-output_video='/home/poly/jzp/kgr/ans.mp4'
+image_folder=r'D:\projects\kgr\20261010\dataset\HDY-V80-668a503_20261005_184248-ans'
+output_video=r'D:\projects\kgr\20261010\dataset\HDY-V80-668a503_20261005_184248-ans.mp4'
 images_to_video(image_folder, output_video,fps=2)

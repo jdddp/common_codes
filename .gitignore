@@ -9,6 +9,7 @@
 *.png
 *.npy
 *.npz
+*.pt
 /python/image_enhanced/mblyy/
 **/model.ncnn.bin
 **/model.ncnn.param
