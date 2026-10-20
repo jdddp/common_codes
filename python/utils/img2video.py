@@ -53,4 +53,4 @@ def images_to_video(image_folder, output_video, fps=2):
 #     images_to_video(image_folder, output_video)
 image_folder=r'D:\projects\kgr\20261010\dataset\HDY-V80-668a503_20261005_184248-ans'
 output_video=r'D:\projects\kgr\20261010\dataset\HDY-V80-668a503_20261005_184248-ans.mp4'
-images_to_video(image_folder, output_video,fps=2)
+images_to_video(image_folder, output_video,fps=5)

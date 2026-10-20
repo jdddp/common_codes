@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+#  Internal Data Asset Platform - backend API (systemd)
+#
+#  Install as root:
+#      1. put the code at /opt/data_asset_platform  (or edit the paths below)
+#      2. python3 -m venv /opt/data_asset_platform/venv
+#         /opt/data_asset_platform/venv/bin/pip install -r \
+#             /opt/data_asset_platform/backend/requirements.txt
+#         # on a headless server use opencv-python-headless instead, or the
+#         # import fails with "libGL.so.1: cannot open shared object file"
+#      3. edit /opt/data_asset_platform/platform.env   (data dirs, port, ...)
+#      4. useradd --system --home /opt/data_asset_platform --shell /usr/sbin/nologin platform
+#      5. chown -R platform:platform /opt/data_asset_platform
+#      6. cp deploy/data-platform-*.service /etc/systemd/system/
+#         systemctl daemon-reload
+#         systemctl enable --now data-platform-worker data-platform-backend
+#
+#  Apply a config change:
+#      systemctl restart data-platform-worker data-platform-backend
+#
+#  Why there is no EnvironmentFile=: Python reads platform.env by itself
+#  (backend/app/config.py), so the file stays the single place to edit and
+#  systemd never ends up with a second, stale copy of the settings.
+#
+#  Logs: journalctl -u data-platform-backend -f
+# ---------------------------------------------------------------------------
+[Unit]
+Description=Internal Data Asset Platform - backend API
+After=network-online.target data-platform-worker.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=platform
+Group=platform
+WorkingDirectory=/opt/data_asset_platform/backend
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHON_EXE=/opt/data_asset_platform/venv/bin/python
+ExecStartPre=/opt/data_asset_platform/venv/bin/python /opt/data_asset_platform/scripts/init_db.py
+ExecStart=/bin/bash /opt/data_asset_platform/scripts/serve.sh
+Restart=on-failure
+RestartSec=3
+UMask=0022
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

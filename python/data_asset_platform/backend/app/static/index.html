@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>内部数据资产管理平台（免构建页）</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; background:#f4f6fa; color:#1f2430;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+  header { background:#fff; border-bottom:1px solid #e6e9f0; padding:12px 20px;
+    display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:16px; margin:0; }
+  header .muted { color:#8b93a7; font-size:12px; }
+  .wrap { padding:16px 20px 40px; }
+  .card { background:#fff; border-radius:6px; padding:14px 16px; margin-bottom:14px;
+    box-shadow:0 1px 4px rgba(20,30,60,.08); }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+  button, select, input[type=text], input[type=number] { font-size:13px; padding:5px 9px;
+    border:1px solid #d5dae4; border-radius:4px; background:#fff; }
+  button { cursor:pointer; }
+  button:hover { border-color:#3f8cff; color:#3f8cff; }
+  button.primary { background:#3f8cff; border-color:#3f8cff; color:#fff; }
+  button.primary:hover { color:#fff; opacity:.92; }
+  button.danger { color:#d9534f; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { border-bottom:1px solid #eef1f6; padding:7px 8px; text-align:left; vertical-align:middle; }
+  th { background:#fafbfd; font-weight:600; color:#5b6478; white-space:nowrap; }
+  tr:hover td { background:#f9fbff; }
+  .thumb { width:76px; height:42px; object-fit:contain; background:#111; border-radius:3px; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:10px; font-size:12px;
+    background:#eef1f6; color:#5b6478; margin-right:4px; }
+  .tag.ok { background:#e8f7ee; color:#1f8b4c; }
+  .tag.warn { background:#fff5e6; color:#b8791a; }
+  .tag.err { background:#fdeeee; color:#c0392b; }
+  .muted { color:#8b93a7; font-size:12px; }
+  .progress { height:8px; background:#eef1f6; border-radius:4px; overflow:hidden; width:120px; }
+  .progress > div { height:100%; background:#3f8cff; width:0; }
+  /* 上传页两栏：左栏是"怎么进数据"（上传 + 服务端导入挨在一起），右栏是两种方式共用的属性面板 */
+  .upload-cols { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+  .upload-main { flex:1 1 540px; min-width:0; }
+  .upload-side { flex:1 1 340px; min-width:300px;
+    position:sticky; top:56px;                 /* 顶栏分页条 h=47 + 9px 间隙 */
+    max-height:calc(100vh - 70px); overflow:auto;
+    padding-left:14px; border-left:1px solid #eef1f6; }
+  .hint-box { margin-bottom:10px; }
+  .hint-box summary { cursor:pointer; }
+  .hint-box summary:hover { color:#3f8cff; }
+  /* 取值控件的尺寸走 class，才好按所在栏位重排（原来是行内写死的） */
+  .attr-label { min-width:200px; }
+  .val-input { min-width:220px; }
+  .attr-candidates { margin-left:208px; }
+  /* 窄栏里改竖排：属性名一行、取值+操作一行、候选整行 */
+  .upload-side .attr-label { min-width:100%; font-weight:600; }
+  .upload-side .val-input { min-width:0; flex:1 1 auto; }
+  .upload-side .attr-candidates { margin-left:0; }
+  /* 顶部分页导航：上传 / 数据查询 / 属性管理 */
+  .tabs { display:flex; gap:6px; position:sticky; top:0; z-index:20; background:#fff;
+    border-radius:6px; padding:6px; margin-bottom:14px;
+    box-shadow:0 1px 4px rgba(20,30,60,.08); }
+  .tabs button { border:1px solid transparent; background:transparent; padding:7px 18px;
+    border-radius:4px; color:#5b6478; font-weight:600; }
+  .tabs button:hover { background:#eef4ff; border-color:transparent; color:#3f8cff; }
+  .tabs button.on, .tabs button.on:hover { background:#3f8cff; border-color:#3f8cff;
+    color:#fff; }
+  .pager { display:flex; gap:8px; align-items:center; margin-top:12px; }
+  .link { color:#3f8cff; cursor:pointer; text-decoration:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>内部数据资产管理平台</h1>
+  <span class="muted">免构建页：上传 / 数据查询 / 属性管理，浏览 · 在线查看 · 下载都在"数据查询"里</span>
+  <div style="flex:1"></div>
+  <a class="link" href="/docs" target="_blank">API 文档</a>
+</header>
+
+<div class="wrap">
+  <!-- -------------------- 分页导航（顶栏，滚动时吸顶） -------------------- -->
+  <nav class="tabs" id="pageTabs">
+    <button type="button" data-page="upload" class="on" onclick="showPage('upload')">上传</button>
+    <button type="button" data-page="query" onclick="showPage('query')">数据查询</button>
+    <button type="button" data-page="attrs" onclick="showPage('attrs')">属性管理</button>
+  </nav>
+
+  <!-- -------------------- 新建属性（三个页面共用，位置固定在导航下方） -------------------- -->
+  <div class="card" id="newAttrCard" style="display:none">
+    <div class="row">
+      <strong style="font-size:14px">新建属性</strong>
+      <span class="muted">属性库里没有时才需要新建；保存成功后该属性会保留在属性库中，之后上传与检索都可直接复用</span>
+      <div style="flex:1"></div>
+      <button onclick="closeNewAttr()">关闭</button>
+    </div>
+    <div class="row">
+      <input type="text" id="newAttrName" placeholder="属性名称（如 航次、海域）" style="width:260px" />
+      <button class="primary" id="newAttrSave" onclick="saveNewAttr()">保存并关联</button>
+      <span class="muted" id="newAttrHint"></span>
+    </div>
+  </div>
+
+  <!-- ------------------------------ 上传页 ------------------------------ -->
+  <div class="card" id="page-upload">
+   <div class="upload-cols">
+
+      <!-- 左栏：两种进数据方式挨在一起，中间只留一条轻分隔（不再被属性面板切断） -->
+      <div class="upload-main">
+        <div class="row">
+          <strong style="font-size:14px">上传文件</strong>
+          <input type="file" id="uploadInput" multiple style="display:none" />
+          <button onclick="document.getElementById('uploadInput').click()">选择文件</button>
+          <button class="primary" id="uploadBtn" onclick="startUpload()" disabled>开始上传</button>
+          <span class="muted" id="uploadHint">选择文件后可上传（分片 + 断点续传 + 内容去重）</span>
+        </div>
+        <div id="uploadList"></div>
+
+        <hr style="border:none;border-top:1px solid #eef1f6;margin:12px 0" />
+        <div class="row">
+          <strong style="font-size:14px">服务端导入</strong>
+          <input type="text" id="importPaths" placeholder="服务器上的文件/目录路径，多个用分号分隔" style="width:340px" />
+          <input type="text" id="importRoot" placeholder="根目录名（可空）" style="width:150px" />
+          <label class="muted"><input type="checkbox" id="importMove" /> 移动原文件</label>
+          <button class="primary" onclick="startImport()">导入</button>
+          <span class="muted">适合把服务器上已有的大文件登记进来（默认复制，不走浏览器上传）</span>
+        </div>
+        <div id="importResult" class="muted"></div>
+      </div>
+
+      <!-- 右栏：给左栏两种方式共用的属性（所以放在旁边，而不是夹在两者中间） -->
+      <aside class="upload-side">
+        <div style="margin-bottom:6px">
+          <strong style="font-size:14px">关联属性</strong>
+          <div class="muted" style="margin-top:2px">给左栏<b>两种方式共用</b>——勾一次，浏览器上传和服务端导入都带上</div>
+        </div>
+        <details class="hint-box">
+          <summary class="muted">这个属性面板怎么用？</summary>
+          <div class="muted" style="margin-top:6px;line-height:1.75">属性就是「名称 + 值」：属性库存的是可复用的属性名，值在每次上传/导入时按需填写，值一律按文本存（可以从"已有的值"里直接挑，也可以填新的）。<b>勾选即关联、取消勾选即移除</b>（不用按 Ctrl、也不用再点"添加"），留空的属性不会提交。库里没有的先点「新建属性…」建立（建好即入库，下次直接复用）；每次上传都是同一批属性时点<b>「复用上次」</b>，属性和值一起带出来、预填值标橙色提醒确认。文件归属、类别这类信息同样只是一个普通属性，需要时自己在属性库建一个即可。</div>
+        </details>
+
+        <!-- 内置「日期」：有自己的一行，不进下面的复选框（内置属性不用勾，也没有"留空不提交"的歧义） -->
+        <div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed #eef1f6">
+          <label for="uploadDate" style="font-weight:600">日期</label>
+          <input type="date" id="uploadDate" style="width:100%;margin-top:4px" />
+          <div class="muted" style="margin-top:3px">
+            内置属性、不可删除。默认是<b>今天</b>，可改成实际作业日期；
+            按时间范围筛数据就靠它；留空则本次不带日期
+          </div>
+        </div>
+
+        <div id="attrPickBox" style="width:100%">
+          <input type="text" id="attrPickFilter" placeholder="搜索属性名" oninput="renderAttrPicker()" style="width:100%;margin-bottom:6px;display:none" />
+          <div id="attrPickList" style="max-height:220px;overflow:auto;border:1px solid #d5dae4;border-radius:4px;padding:4px 6px"></div>
+          <div class="muted" id="attrPickHint" style="margin-top:4px"></div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button onclick="openNewAttr('upload')">新建属性…</button>
+            <button onclick="reuseLastAttrs()" id="reuseBtn" title="把上一次上传/导入用过的属性和值一起带出来">复用上次</button>
+            <button class="danger" onclick="clearSelectedAttrs()">清空已选</button>
+          </div>
+        </div>
+        <div id="attrValueBox" style="margin-top:10px"></div>
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- ------------------------------ 数据查询页 ------------------------------ -->
+  <div class="card" id="page-query" style="display:none">
+    <div class="row">
+      <input type="text" id="keyword" placeholder="文件名 / 路径关键词" style="width:220px" />
+      <select id="statusFilter">
+        <option value="">全部状态</option>
+        <option value="ready">可在线查看</option>
+        <option value="pending">排队中</option>
+        <option value="unsupported">不支持</option>
+        <option value="failed">解析失败</option>
+      </select>
+      <input type="text" id="extFilter" placeholder="格式，如 dat" style="width:120px" />
+      <button class="primary" onclick="reload(1)">检索</button>
+      <button onclick="resetFilter()">重置</button>
+      <div style="flex:1"></div>
+      <span class="muted" id="totalHint"></span>
+    </div>
+
+    <div class="row" style="border-top:1px solid #eef1f6;padding-top:10px;margin-bottom:6px">
+      <strong style="font-size:13px">属性条件</strong>
+      <span class="muted">可叠加多个属性条件（条件之间是“并且”），全部来自属性库；筛选只有「等于」一种，值是文本；输入框里可直接从“已有的取值”里挑（也可以手输新值）</span>
+      <div style="flex:1"></div>
+      <button onclick="addAttrFilter()">＋ 添加属性条件</button>
+      <button onclick="openNewAttr('filter')">新建属性…</button>
+    </div>
+    <div id="attrFilterBox" style="margin-bottom:10px"></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>预览</th><th>文件名</th><th>目录</th><th>大小</th>
+          <th>协议</th><th>帧数</th><th>状态</th><th>上传时间</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="fileRows"></tbody>
+    </table>
+
+    <div class="pager">
+      <button onclick="reload(page - 1)">上一页</button>
+      <span class="muted" id="pageHint"></span>
+      <button onclick="reload(page + 1)">下一页</button>
+    </div>
+  </div>
+
+  <!-- ------------------------------ 属性管理页（属性是可复用的名称） ------------------------------ -->
+  <div class="card" id="page-attrs" style="display:none">
+    <div class="row">
+      <strong style="font-size:14px">属性库管理</strong>
+      <span class="muted">属性库存的是可复用的属性名（值一律按文本存，不设类型）；已被文件用过的属性不允许删除（要删就先清掉文件上的该属性值）</span>
+      <div style="flex:1"></div>
+      <button onclick="loadDefinitions()">刷新</button>
+      <button onclick="openNewAttr('library')">新建属性…</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>属性名</th><th>已用</th><th>创建时间</th><th>操作</th></tr>
+      </thead>
+      <tbody id="attrRows"></tbody>
+    </table>
+    <div class="muted" id="attrHint" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- 每个属性一个 datalist：值控件输入时可直接挑"已有的取值"（见 ensureValueDatalist） -->
+<div id="attrValueLists" style="display:none"></div>
+<!-- 属性名的 datalist：编辑文件属性时可直接挑属性库里的名字，也可手输新名字 -->
+<datalist id="attrNameList"></datalist>
+
+<script>
+// ============================================================================
+//  免 Node 构建的轻量页面：直接用后端 API 完成"传 → 找 → 看 → 下载"闭环。
+//  正式前端（Vue 3 + Element Plus）在 frontend/ 目录，npm run build 后会自动接管首页。
+// ============================================================================
+const API = '/api'
+const CHUNK = 8 * 1024 * 1024
+const STATUS_TEXT = {
+  ready: ['可在线查看', 'ok'], pending: ['排队中', 'warn'], none: ['未解析', ''],
+  unsupported: ['不支持在线查看', ''], failed: ['解析失败', 'err'],
+}
+let page = 1
+let pageSize = 50
+
+const el = (id) => document.getElementById(id)
+async function request(method, path, { query, body, raw } = {}) {
+  const url = new URL(API + path, location.origin)
+  Object.entries(query || {}).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return
+    if (Array.isArray(v)) v.forEach((item) => url.searchParams.append(k, item))
+    else url.searchParams.append(k, v)
+  })
+  const options = { method, headers: {} }
+  if (body !== undefined) {
+    if (raw) { options.body = body; options.headers['Content-Type'] = 'application/octet-stream' }
+    else { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body) }
+  }
+  const response = await fetch(url, options)
+  if (!response.ok) {
+    let detail = response.status + ' ' + response.statusText
+    try { const data = await response.json(); if (data.detail) detail = data.detail } catch (e) {}
+    throw new Error(detail)
+  }
+  return response.headers.get('content-type')?.includes('json') ? response.json() : response.text()
+}
+
+function formatSize(bytes) {
+  if (bytes === null || bytes === undefined) return '-'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = Number(bytes); let unit = 0
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1 }
+  return value.toFixed(unit === 0 ? 0 : 1) + ' ' + units[unit]
+}
+
+// ------------------------------------------------------------------ 分页
+// 免构建页拆成三个页面：上传 / 数据查询 / 属性管理。
+// 用 location.hash 记住当前页（# /upload 等），刷新后仍停在原来的页面。
+const PAGES = ['upload', 'query', 'attrs']
+let currentPage = 'upload'
+
+function pageFromHash() {
+  const key = String(location.hash || '').replace(/^#\/?/, '')
+  return PAGES.indexOf(key) >= 0 ? key : 'upload'
+}
+
+// 只切显隐，不销毁 DOM —— 所以切回来时查询条件、分页、已填的取值全都还在。
+// keepHash 为真表示"页名本来就是从 hash 来的"，不必回写地址栏（避免自触发 hashchange）。
+function showPage(name, keepHash) {
+  if (PAGES.indexOf(name) < 0) name = 'upload'
+  currentPage = name
+  PAGES.forEach((key) => {
+    const section = el('page-' + key)
+    if (section) section.style.display = key === name ? '' : 'none'
+    const button = document.querySelector('#pageTabs button[data-page="' + key + '"]')
+    if (button) button.classList.toggle('on', key === name)
+  })
+  if (!keepHash && location.hash !== '#/' + name) {
+    history.replaceState(null, '', '#/' + name)   // replaceState：回退键不会被"切页"占掉
+  }
+}
+
+// ------------------------------------------------------------- 服务端导入
+async function startImport() {
+  const raw = el('importPaths').value.trim()
+  if (!raw) { alert('请填写服务器上的路径'); return }
+  const paths = raw.split(/[;\n]+/).map((item) => item.trim()).filter(Boolean)
+  el('importResult').textContent = '导入中…（大文件复制/校验需要时间）'
+  const submitted = collectUploadAttributes()   // 记住这一批，成功后作为下次「复用上次」的来源
+  try {
+    const data = await request('POST', '/import', {
+      body: {
+        paths,
+        root_name: el('importRoot').value.trim(),
+        move: el('importMove').checked,
+        attributes: submitted,
+        auto_create_attributes: true,
+      },
+    })
+    const lines = data.items.map((item) => {
+      const size = item.size_bytes ? ` (${formatSize(item.size_bytes)})` : ''
+      return item.status === 'done'
+        ? `✔ ${item.path}${size} → ${item.rel_path}${item.deduped ? ' [去重]' : ''}${item.moved ? ' [已移动]' : ''}`
+        : `✘ ${item.path}：${item.message}`
+    })
+    el('importResult').innerHTML = lines.map(escapeHtml).join('<br />')
+    if (data.items.some((item) => item.status === 'done')) {
+      reusedValues.clear()
+      saveLastUploadAttrs(submitted)
+    }
+    reload(1)
+    await loadAttributeValues()
+  } catch (error) {
+    el('importResult').textContent = '导入失败：' + error.message
+  }
+}
+
+// ------------------------------------------------------------------ 检索
+async function reload(target) {
+  page = Math.max(1, target || page)
+  const query = {
+    keyword: el('keyword').value.trim(),
+    parse_status: el('statusFilter').value || undefined,
+    ext: el('extFilter').value.trim() ? [el('extFilter').value.trim()] : undefined,
+    attr: collectAttrConditions(),
+    page, page_size: pageSize,
+  }
+  const data = await request('GET', '/files', { query })
+  el('totalHint').textContent = `共 ${data.total} 个文件`
+  el('pageHint').textContent = `第 ${data.page} / ${Math.max(1, Math.ceil(data.total / pageSize))} 页`
+  el('fileRows').innerHTML = data.items.map(renderRow).join('') ||
+    '<tr><td colspan="9" class="muted">暂无数据</td></tr>'
+  // 正在编辑某个文件的属性时，重新挂上属性编辑区（换页/筛选后自动消失）
+  if (editingFileId !== null) renderFileAttrEditor()
+}
+
+function renderRow(row) {
+  const [text, kind] = STATUS_TEXT[row.parse_status] || [row.parse_status, '']
+  const attrs = Object.entries(row.attributes || {})
+    .map(([name, value]) => `<span class="tag">${escapeHtml(name)}: ${escapeHtml(String(value))}</span>`)
+    .join('')
+  const thumb = row.parse_status === 'ready'
+    ? `<img class="thumb" src="${API}/files/${row.id}/thumbnail" loading="lazy" />`
+    : '<span class="muted">-</span>'
+  const view = row.parse_status === 'ready'
+    ? `<a class="link" href="/static/viewer.html?file=${row.id}" target="_blank" rel="noopener">在线查看</a>`
+    : `<a class="link" onclick="parseNow(${row.id})">重解析</a>`
+  return `<tr>
+    <td>${thumb}</td>
+    <td>${escapeHtml(row.original_name)}${attrs ? '<div>' + attrs + '</div>' : ''}</td>
+    <td>${escapeHtml(row.rel_path || '')}</td>
+    <td>${formatSize(row.size_bytes)}</td>
+    <td>${(row.protocol || '-').toUpperCase()}</td>
+    <td>${row.frame_count ?? '-'}</td>
+    <td><span class="tag ${kind}">${text}</span></td>
+    <td class="muted">${escapeHtml(row.uploaded_at || '')}</td>
+    <td>
+      ${view}
+      <a class="link" onclick="editAttrs(${row.id})">${editingFileId === row.id ? '收起属性' : '属性'}</a>
+      <a class="link" href="${API}/files/${row.id}/download">下载</a>
+      <a class="link" onclick="removeFile(${row.id})">删除</a>
+    </td>
+  </tr>${editingFileId === row.id
+    ? '<tr><td colspan="9" style="background:#fafafa"><div id="fileAttrEditor"></div></td></tr>'
+    : ''}`
+}
+
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g, (ch) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ))
+}
+
+function resetFilter() {
+  el('keyword').value = ''
+  el('statusFilter').value = ''
+  el('extFilter').value = ''
+  clearAttrFilters()
+  reload(1)
+}
+
+async function parseNow(id) {
+  try {
+    const result = await request('POST', `/files/${id}/parse`)
+    alert(result.parse_status === 'ready'
+      ? `解析成功：${result.frame_count} 帧`
+      : (result.reason || '该格式暂不支持在线查看'))
+    reload(page)
+  } catch (error) { alert(error.message) }
+}
+
+async function removeFile(id) {
+  if (!confirm('确定删除该文件的登记信息吗？')) return
+  try {
+    await request('DELETE', `/files/${id}`)
+    if (editingFileId === id) { editingFileId = null; editAttrRows = [] }
+    reload(page)
+    await loadAttributeValues()
+  } catch (error) { alert(error.message) }
+}
+
+// ------------------------------------------------------- 单个文件的属性编辑
+// "已经添加的数据"也要能补属性：库里已有 → 直接关联；库里没有 → 填名字即新建并保留
+let editingFileId = null
+let editAttrRows = []           // [{name, value}]，输入即写回，重渲染不丢
+
+async function editAttrs(id) {
+  if (editingFileId === id) { cancelEditAttrs(); return }
+  try {
+    const detail = await request('GET', `/files/${id}`)
+    editingFileId = id
+    editAttrRows = Object.entries(detail.attributes || {}).map(([name, value]) => (
+      { name, value: value === null || value === undefined ? '' : String(value) }
+    ))
+    if (!editAttrRows.some((row) => !row.name)) editAttrRows.push({ name: '', value: '' })
+    await reload(page)
+    const host = el('fileAttrEditor')
+    if (host) host.scrollIntoView({ block: 'center' })
+  } catch (error) { alert(error.message) }
+}
+
+function cancelEditAttrs() {
+  editingFileId = null
+  editAttrRows = []
+  reload(page)
+}
+
+function renderFileAttrEditor() {
+  const host = el('fileAttrEditor')
+  if (!host) return
+  host.innerHTML = ''
+
+  const hint = document.createElement('div')
+  hint.className = 'muted'
+  hint.style.margin = '4px 0 8px'
+  hint.textContent = '属性只有名称、值一律按文本保存；值留空表示该文件不设置这个属性（会移除）。'
+    + '属性库里没有的名字会自动新建并保留，之后上传与检索可复用。'
+  host.appendChild(hint)
+
+  editAttrRows.forEach((row, index) => {
+    const line = document.createElement('div')
+    line.className = 'row'
+    line.style.marginBottom = '4px'
+
+    const nameInput = document.createElement('input')
+    nameInput.type = 'text'
+    nameInput.style.minWidth = '180px'
+    nameInput.placeholder = '属性名（可从属性库挑，也可新填）'
+    nameInput.value = row.name || ''
+    nameInput.setAttribute('list', 'attrNameList')
+    line.appendChild(nameInput)
+
+    const valueInput = document.createElement('input')
+    valueInput.type = 'text'
+    valueInput.style.minWidth = '240px'
+    valueInput.placeholder = '值（留空 = 不设置该属性）'
+    valueInput.value = row.value === undefined || row.value === null ? '' : String(row.value)
+    line.appendChild(valueInput)
+
+    // 内置「日期」用日期选择器（取值天然是 YYYY-MM-DD）。但老库里若存过**不是日期**的值，
+    // 一律保持文本框——日期控件会把非法值显示成空的，一保存就把数据悄悄清掉了。
+    const syncValueControl = () => {
+      const definition = definitions.find((item) => item.name === row.name)
+      const isDate = Boolean(definition && definition.is_builtin)
+      const looksLikeDate = valueInput.value === '' || /^\d{4}-\d{2}-\d{2}$/.test(valueInput.value)
+      if (isDate && looksLikeDate) {
+        valueInput.type = 'date'
+        valueInput.placeholder = '作业日期（留空 = 不设置该属性）'
+        valueInput.removeAttribute('list')
+        return
+      }
+      valueInput.type = 'text'
+      valueInput.placeholder = isDate
+        ? '这个值不是日期（应为 YYYY-MM-DD），改好才能保存'
+        : '值（留空 = 不设置该属性）'
+      if (row.name) valueInput.setAttribute('list', ensureValueDatalist(row.name))
+      else valueInput.removeAttribute('list')
+    }
+    syncValueControl()
+
+    // 名字一变，"已有取值"建议也跟着换（不同属性的候选值不同），日期控件也跟着切
+    nameInput.oninput = () => {
+      row.name = nameInput.value
+      syncValueControl()
+    }
+    valueInput.oninput = () => { row.value = valueInput.value }
+    valueInput.onchange = () => { row.value = valueInput.value; syncValueControl() }
+
+    const remove = document.createElement('button')
+    remove.className = 'danger'
+    remove.textContent = '移除'
+    remove.onclick = () => {
+      editAttrRows.splice(index, 1)
+      if (!editAttrRows.some((item) => !item.name)) editAttrRows.push({ name: '', value: '' })
+      renderFileAttrEditor()
+    }
+    line.appendChild(remove)
+    host.appendChild(line)
+  })
+
+  const actions = document.createElement('div')
+  actions.className = 'row'
+  actions.style.marginTop = '6px'
+
+  const add = document.createElement('button')
+  add.textContent = '+ 添加属性'
+  add.onclick = () => {
+    if (editAttrRows.some((item) => !item.name)) { renderFileAttrEditor(); return }
+    editAttrRows.push({ name: '', value: '' })
+    renderFileAttrEditor()
+  }
+  actions.appendChild(add)
+
+  const save = document.createElement('button')
+  save.className = 'primary'
+  save.textContent = '保存属性'
+  save.onclick = saveEditAttrs
+  actions.appendChild(save)
+
+  const cancel = document.createElement('button')
+  cancel.textContent = '取消'
+  cancel.onclick = cancelEditAttrs
+  actions.appendChild(cancel)
+
+  host.appendChild(actions)
+}
+
+async function saveEditAttrs() {
+  const values = []
+  const seen = new Set()
+  for (const row of editAttrRows) {
+    const name = String(row.name || '').trim()
+    if (!name) continue
+    if (/[=]/.test(name)) {
+      alert(`属性名「${name}」不合法：不能包含 =（筛选条件里用它分隔属性名和值）`)
+      return
+    }
+    const value = row.value === undefined || row.value === null ? '' : String(row.value).trim()
+    if (value === '') continue          // 留空 = 不设置该属性
+    if (seen.has(name)) {               // 同名重复：后填的覆盖先填的
+      const target = values.find((item) => item.name === name)
+      target.value = value
+      continue
+    }
+    seen.add(name)
+    values.push({ name, value })
+  }
+  try {
+    await request('PUT', `/files/${editingFileId}/attributes`, {
+      body: { values, replace: true, create_missing: true },
+    })
+    editingFileId = null
+    editAttrRows = []
+    await loadDefinitions()             // 可能新建了属性 → 刷属性库与候选值
+    await reload(page)
+    el('pageHint').textContent = '属性已保存'
+  } catch (error) { alert('保存失败：' + error.message) }
+}
+
+// ------------------------------------------------------------------ 上传
+let pending = []
+
+el('uploadInput').addEventListener('change', (event) => {
+  pending = Array.from(event.target.files)
+  el('uploadList').innerHTML = pending.map((file, index) => `
+    <div class="row" style="margin-bottom:4px">
+      <span style="min-width:260px">${escapeHtml(file.name)}</span>
+      <span class="muted">${formatSize(file.size)}</span>
+      <div class="progress" id="bar-${index}"><div></div></div>
+      <span class="muted" id="msg-${index}">待上传</span>
+    </div>`).join('')
+  el('uploadBtn').disabled = !pending.length
+  el('uploadHint').textContent = `已选择 ${pending.length} 个文件`
+  event.target.value = ''
+})
+
+async function startUpload() {
+  el('uploadBtn').disabled = true
+  const submitted = collectUploadAttributes()   // 记住这一批，成功后作为下次「复用上次」的来源
+  let succeeded = 0
+  try {
+    const response = await request('POST', '/uploads/init', {
+      body: {
+        attributes: submitted,
+        // 兜底：属性库里没有的 key 由服务端按值类型补建并保留（界面里已先「新建属性」登记）
+        auto_create_attributes: true,
+        files: pending.map((file, index) => ({
+          client_key: String(index), name: file.name, size: file.size,
+        })),
+      },
+    })
+    for (const item of response.items) {
+      const index = Number(item.client_key)
+      const file = pending[index]
+      if (item.status === 'done') { setUploadMsg(index, '秒传完成', 100); succeeded += 1; continue }
+      if (item.status === 'failed') { setUploadMsg(index, item.message || '失败', 0); continue }
+      await uploadOne(index, file, item)
+      succeeded += 1
+    }
+    el('uploadHint').textContent = '上传结束'
+    if (succeeded) {
+      reusedValues.clear()
+      saveLastUploadAttrs(submitted)
+    }
+    reload(1)
+    await loadAttributeValues()
+  } catch (error) {
+    alert(error.message)
+  } finally {
+    el('uploadBtn').disabled = false
+  }
+}
+
+async function uploadOne(index, file, session) {
+  const total = session.total_chunks
+  const chunkSize = session.chunk_size
+  const received = new Set(session.received || [])
+  for (let chunk = 0; chunk < total; chunk += 1) {
+    if (received.has(chunk)) continue
+    const start = chunk * chunkSize
+    const blob = file.slice(start, Math.min(start + chunkSize, file.size))
+    await request('PUT', `/uploads/${session.session_id}/chunks/${chunk}`, { body: blob, raw: true })
+    setUploadMsg(index, `${chunk + 1}/${total} 片`, Math.floor(((chunk + 1) / total) * 95))
+  }
+  const result = await request('POST', `/uploads/${session.session_id}/complete`)
+  setUploadMsg(index, result.deduped ? '完成（复用已有存储）' : '完成，已排队解析', 100)
+}
+
+function setUploadMsg(index, text, percent) {
+  const bar = document.querySelector(`#bar-${index} > div`)
+  if (bar) bar.style.width = percent + '%'
+  const msg = el('msg-' + index)
+  if (msg) msg.textContent = text
+}
+
+// ------------------------------------------------------------------ 关联属性
+// 语义：属性库里已有 → 直接复用；属性库里没有 → 新建并保留（"取或建"由 /attributes/resolve 保证幂等）
+// 属性只有名称；值一律是字符串（文本），没有类型概念
+let definitions = []
+let selectedAttrs = []            // 本次上传/导入关联的属性（来自属性库）
+let uploadAttrInputs = new Map()  // 属性名 -> 取值控件
+let attrFilters = []              // 检索条件 [{name, op, value}]
+let newAttrTarget = 'upload'      // 新建属性后关联到"上传"还是"筛选"
+let attrValueOptions = {}         // 属性名 -> 库里已出现过的取值 [{value, file_count}]
+let reusedValues = new Map()      // 「复用上次」带出来的预填值（用户一改就丢掉，用于标橙提醒确认）
+const LAST_UPLOAD_KEY = 'dap_last_upload_attrs'
+// 内置属性：平台自动建立、不可删除；值是 YYYY-MM-DD 的真实日期，只有它支持时间范围筛选
+const DATE_ATTR = '日期'
+
+// 「已有的值」复用：为每个属性准备一个 datalist，输入框通过 list= 关联
+// 这样填写/筛选时可以直接挑已有取值，也可以手输新值（datalist 只是建议，不限制输入）
+function valueOptionsOf(name) {
+  return attrValueOptions[name] || []
+}
+
+// datalist 的 id 用序号：属性名可能是中文/带空格，不适合直接当元素 id
+const datalistIds = new Map()
+function datalistIdOf(name) {
+  if (!datalistIds.has(name)) datalistIds.set(name, `attrval-${datalistIds.size + 1}`)
+  return datalistIds.get(name)
+}
+
+function ensureValueDatalist(name) {
+  const host = el('attrValueLists')
+  const id = datalistIdOf(name)
+  let datalist = document.getElementById(id)
+  if (!datalist) {
+    datalist = document.createElement('datalist')
+    datalist.id = id
+    host.appendChild(datalist)
+  }
+  const options = valueOptionsOf(name)
+  datalist.innerHTML = ''
+  options.forEach((entry) => {
+    const option = document.createElement('option')
+    option.value = entry.value
+    const count = Number(entry.file_count || 0)
+    option.label = count > 1 ? `${entry.value}（${count} 条）` : entry.value
+    datalist.appendChild(option)
+  })
+  return id
+}
+
+async function loadAttributeValues() {
+  try {
+    const data = await request('GET', '/attributes/values', { query: { limit: 200 } })
+    attrValueOptions = {}
+    data.items.forEach((item) => { attrValueOptions[item.name] = item.items || [] })
+  } catch (error) {
+    attrValueOptions = {}
+  }
+  Object.keys(attrValueOptions).forEach((name) => ensureValueDatalist(name))
+  // 上传/导入区的取值控件要跟着刷新（渲染已改为保留已填的值，不会清掉正在输入的内容）
+  renderAttrValues()
+}
+
+async function loadDefinitions() {
+  try {
+    const data = await request('GET', '/attributes')
+    definitions = data.items
+  } catch (error) {
+    definitions = []
+  }
+  await loadAttributeValues()
+  renderAttrPicker()
+  renderAttrFilters()
+  renderAttrTable()
+}
+
+// 属性库管理：列出可复用的属性名；被文件用过的属性禁止删除
+function renderAttrTable() {
+  const body = el('attrRows')
+  if (!body) return
+  if (!definitions.length) {
+    body.innerHTML = '<tr><td colspan="4" class="muted">属性库为空，点「新建属性…」建立第一个属性</td></tr>'
+    return
+  }
+  body.innerHTML = definitions.map((item) => {
+    const used = Number(item.used_count || 0)
+    const builtin = Boolean(item.is_builtin)
+    const nameCell = builtin
+      ? `${escapeHtml(item.name)} <span class="muted" title="平台自动建立，不可删除、不可改名；取值是真实日期 YYYY-MM-DD，可按时间范围筛选">（内置）</span>`
+      : escapeHtml(item.name)
+    const action = builtin
+      ? '<span class="muted" title="内置属性由平台维护">内置，不可删</span>'
+      : used
+        ? `<span class="muted" title="已有 ${used} 条取值，需先清掉">已用，不可删</span>`
+        : `<a class="link" onclick="removeAttr(${item.id})">删除</a>`
+    return `<tr>
+      <td>${nameCell}</td>
+      <td>${used}</td>
+      <td class="muted">${escapeHtml(item.created_at || '')}</td>
+      <td>${action}</td>
+    </tr>`
+  }).join('')
+}
+
+async function removeAttr(id) {
+  const definition = definitions.find((item) => item.id === id)
+  const name = definition ? definition.name : String(id)
+  if (!confirm(`确定从属性库删除「${name}」吗？该属性将不再出现在上传/检索里。`)) return
+  try {
+    await request('DELETE', `/attributes/${id}`)
+    await loadDefinitions()
+    el('attrHint').textContent = `已删除属性「${name}」`
+  } catch (error) {
+    el('attrHint').textContent = '删除失败：' + error.message
+  }
+}
+
+function renderAttrPicker() {
+  // 属性名建议：编辑"已经添加的数据"时提示可复用的属性名，也可手输新名字
+  const nameList = el('attrNameList')
+  if (nameList) {
+    nameList.innerHTML = definitions
+      .map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('')
+  }
+
+  const list = el('attrPickList')
+  const hint = el('attrPickHint')
+  const filterBox = el('attrPickFilter')
+  const keyword = String((filterBox && filterBox.value) || '').trim()
+  // 内置「日期」不进这张复选框清单——它在面板最上面有自己的一行（预填今天、可改成作业日期）
+  const pickable = definitions.filter((item) => !item.is_builtin)
+  // 属性多的时候才出现搜索框（库小时不必制造噪音）
+  if (filterBox) filterBox.style.display = pickable.length >= 6 ? '' : 'none'
+
+  if (!pickable.length) {
+    list.innerHTML = '<span class="muted">没有其它可关联的属性（内置「日期」在上面单独一行）</span>'
+    if (hint) hint.textContent = ''
+    syncReuseButton()
+    return
+  }
+
+  const visible = pickable.filter((item) => !keyword || item.name.includes(keyword))
+  list.innerHTML = visible.map((item) => {
+    const checked = selectedAttrs.some((sel) => sel.name === item.name)
+    return `<label style="display:flex;gap:6px;align-items:center;padding:3px 2px;cursor:pointer">`
+      + `<input type="checkbox" data-name="${escapeHtml(item.name)}"${checked ? ' checked' : ''}`
+      + ` onchange="togglePickedAttr(this)" />`
+      + `<span>${escapeHtml(item.name)}</span></label>`
+  }).join('') || '<span class="muted">没有匹配的属性</span>'
+
+  if (hint) {
+    hint.textContent = selectedAttrs.length
+      ? `已勾选 ${selectedAttrs.length} 个 → 右边填值（留空的不提交）`
+      : '勾选后在右边填值；留空的属性不会提交'
+  }
+  syncReuseButton()
+}
+
+// 「复用上次」只在确实存有上一次带属性的记录时才可点
+function syncReuseButton() {
+  const button = el('reuseBtn')
+  if (button) button.disabled = !readLastUploadAttrs()
+}
+
+// 取值控件：一律文本框 + "已有取值"建议（值都是字符串，不再按类型换控件）
+function buildValueInput(definition, store, initial) {
+  const node = document.createElement('input')
+  node.type = 'text'
+  node.className = 'val-input'          // 尺寸走 class：属性面板在窄栏里要另排
+  // 挂上"已有取值"建议（原生 datalist：输入时下拉可选，也能继续手输新值）
+  node.setAttribute('list', ensureValueDatalist(definition.name))
+  if (initial !== undefined && initial !== null && initial !== '') node.value = String(initial)
+  if (store) store.set(definition.name, node)
+  return node
+}
+
+// 「复用上次」带出来的值：标橙提醒"这是上次的值，先确认"；一改（含清空）就取消预填标记
+function markReusedValue(input, name) {
+  input.style.background = '#fff5e6'
+  input.style.borderColor = '#d9a441'
+  input.title = '来自上次上传的预填值：确认无误再上传，或直接改掉'
+  input.addEventListener('input', () => {
+    input.style.background = ''
+    input.style.borderColor = ''
+    input.title = ''
+    reusedValues.delete(name)
+  })
+}
+
+function renderAttrValues() {
+  const box = el('attrValueBox')
+  // 重绘前记住已填的值：候选列表刷新时不能把用户正在填的内容清掉
+  const kept = new Map()
+  uploadAttrInputs.forEach((node, name) => { if (node.value !== '') kept.set(name, node.value) })
+  box.innerHTML = ''
+  uploadAttrInputs = new Map()
+  if (!selectedAttrs.length) {
+    box.innerHTML = '<span class="muted">尚未关联属性（可选）</span>'
+    renderAttrPicker()
+    return
+  }
+  selectedAttrs.forEach((definition) => {
+    const choices = valueOptionsOf(definition.name)
+    const item = document.createElement('div')
+    item.style.marginBottom = '8px'
+
+    const row = document.createElement('div')
+    row.className = 'row'
+    row.style.marginBottom = '4px'
+    const label = document.createElement('span')
+    label.className = 'attr-label'
+    label.textContent = definition.name
+    row.appendChild(label)
+
+    // 已经填过的值优先（候选刷新/勾选变化都不能覆盖用户输入），否则用「复用上次」的预填值
+    const initial = kept.has(definition.name)
+      ? kept.get(definition.name)
+      : reusedValues.get(definition.name)
+    const input = buildValueInput(definition, uploadAttrInputs, initial)
+    input.placeholder = choices.length
+      ? '点下面的已有值，或直接手输新值'
+      : '这个属性还没有取值，直接填即可'
+    if (reusedValues.has(definition.name)) markReusedValue(input, definition.name)
+    row.appendChild(input)
+
+    const remove = document.createElement('button')
+    remove.className = 'danger'
+    remove.textContent = '移除'
+    remove.onclick = () => {
+      selectedAttrs = selectedAttrs.filter((item2) => item2.name !== definition.name)
+      renderAttrValues()
+    }
+    row.appendChild(remove)
+    item.appendChild(row)
+
+    // 已有取值直接列出来，点一下就填进输入框（原生 datalist 只是建议，藏得深、不好找）
+    const hint = document.createElement('div')
+    hint.className = 'muted attr-candidates'
+    if (choices.length) {
+      const shown = choices.slice(0, 12)
+      hint.textContent = `已有值（共 ${choices.length} 个，点一下即填入）：`
+      shown.forEach((entry) => {
+        const count = Number(entry.file_count || 0)
+        const chip = document.createElement('a')
+        chip.className = 'link'
+        chip.textContent = count > 1 ? `${entry.value}（${count} 条）` : String(entry.value)
+        chip.style.marginRight = '6px'
+        chip.href = 'javascript:void(0)'
+        chip.onclick = () => { input.value = String(entry.value); input.focus() }
+        hint.appendChild(chip)
+      })
+      if (choices.length > shown.length) hint.append('…（其余继续手输）')
+      const clear = document.createElement('a')
+      clear.className = 'link'
+      clear.href = 'javascript:void(0)'
+      clear.textContent = '清空'
+      clear.onclick = () => { input.value = ''; input.focus() }
+      hint.appendChild(clear)
+    } else {
+      hint.textContent = '暂无已有取值：直接手输（本次上传后它就会成为下次的候选）'
+    }
+    item.appendChild(hint)
+    box.appendChild(item)
+  })
+  renderAttrPicker()
+}
+
+function togglePickedAttr(box) {
+  const name = box.getAttribute('data-name')
+  const definition = definitions.find((item) => item.name === name)
+  if (!definition) { box.checked = false; return }   // 属性库里已经没有了
+  if (box.checked) {
+    if (!selectedAttrs.some((item) => item.name === name)) selectedAttrs.push(definition)
+  } else {
+    selectedAttrs = selectedAttrs.filter((item) => item.name !== name)
+    reusedValues.delete(name)          // 取消勾选 = 不要这个属性了，预填值也一并丢掉
+  }
+  // renderAttrValues 末尾会重绘复选框状态
+  renderAttrValues()
+}
+
+function clearSelectedAttrs() {
+  selectedAttrs = []
+  reusedValues.clear()
+  renderAttrValues()
+}
+
+// ---------------------------------------------------------------- 复用上次
+// 记下上一次真正提交上去的属性（名字 + 值），下次一键带出来
+function readLastUploadAttrs() {
+  try {
+    const data = JSON.parse(localStorage.getItem(LAST_UPLOAD_KEY) || 'null')
+    const values = data && data.values
+    if (!values || typeof values !== 'object') return null
+    return Object.keys(values).length ? values : null
+  } catch (error) {
+    return null
+  }
+}
+
+function saveLastUploadAttrs(values) {
+  try {
+    // 「复用上次」**不记日期**：日期表示"这一批数据是哪天的"，把上一批的日期带过来是
+    // 最危险的一种陈旧值；而日期控件每次打开本来就预填了当前日期，带出来只会帮倒忙。
+    const rest = { ...(values || {}) }
+    delete rest[DATE_ATTR]
+    if (Object.keys(rest).length) {
+      localStorage.setItem(LAST_UPLOAD_KEY, JSON.stringify({ values: rest, at: Date.now() }))
+    }
+  } catch (error) {
+    /* 存不下不影响上传，只是下次用不了「复用上次」 */
+  }
+  syncReuseButton()
+}
+
+function reuseLastAttrs() {
+  const values = readLastUploadAttrs()
+  if (!values) { alert('还没有可以复用的记录（至少上传过一次带属性的数据）'); return }
+
+  reusedValues.clear()
+  const missing = []
+  Object.entries(values).forEach(([name, value]) => {
+    const definition = definitions.find((item) => item.name === name)
+    if (!definition) { missing.push(name); return }   // 属性库里已删掉的就不带了
+    if (definition.is_builtin) return                 // 内置日期不复用（见 saveLastUploadAttrs）
+    if (!selectedAttrs.some((item) => item.name === name)) selectedAttrs.push(definition)
+    reusedValues.set(name, String(value))             // 已填过的值不覆盖
+  })
+  renderAttrValues()
+  alert(
+    `已带出 ${reusedValues.size} 个属性（橙色是预填值，确认或改掉后再上传）`
+    + (missing.length ? `；属性库里已删掉、这次不带：${missing.join('、')}` : '')
+  )
+}
+
+// 内置「日期」的取值：YYYY-MM-DD（与 <input type=date> 的取值格式完全一致，可直接提交）
+function todayText() {
+  const now = new Date()
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+// 上传 / 导入时提交的属性值（没填的不提交；值一律是字符串）
+function collectUploadAttributes() {
+  const values = {}
+  // 内置「日期」走它自己的控件，不经过复选框那套 selectedAttrs
+  const dateNode = document.getElementById('uploadDate')
+  if (dateNode && dateNode.value) values[DATE_ATTR] = dateNode.value
+  selectedAttrs.forEach((definition) => {
+    const node = uploadAttrInputs.get(definition.name)
+    if (!node) return
+    const raw = node.value
+    if (raw === '' || raw === null) return
+    values[definition.name] = raw
+  })
+  return values
+}
+
+// ------------------------------------------------------------------ 属性筛选
+// 普通属性的值都是字符串，只有「等于」这一种比较（原先的 不等于/模糊/属于/大于小于 全部去掉）。
+// 例外是内置「日期」：它的值保证是 YYYY-MM-DD，定宽文本的字典序即时间序，所以可以按时间范围筛。
+
+function definitionOf(name) {
+  return definitions.find((item) => item.name === name)
+}
+
+function renderAttrFilters() {
+  const box = el('attrFilterBox')
+  box.innerHTML = ''
+  attrFilters = attrFilters.filter((row) => definitionOf(row.name))
+  if (!attrFilters.length) {
+    box.innerHTML = '<span class="muted">未设置属性条件</span>'
+    return
+  }
+  attrFilters.forEach((row) => {
+    const definition = definitionOf(row.name)
+
+    const line = document.createElement('div')
+    line.className = 'row'
+    line.style.marginBottom = '4px'
+
+    const nameSelect = document.createElement('select')
+    nameSelect.style.cssText = 'min-width:210px'
+    definitions.forEach((item) => {
+      const option = document.createElement('option')
+      option.value = item.name
+      option.textContent = item.name
+      if (item.name === row.name) option.selected = true
+      nameSelect.appendChild(option)
+    })
+    nameSelect.onchange = () => {
+      row.name = nameSelect.value
+      row.value = ''
+      row.from = ''                // 换属性时把时间范围也清掉（另一行不看这两个字段）
+      row.to = ''
+      renderAttrFilters()
+    }
+    line.appendChild(nameSelect)
+
+    if (definition.is_builtin) {
+      // 内置「日期」：同一行给「从 / 到」两个日期框，留空的一端不参与筛选
+      row.from = row.from || ''
+      row.to = row.to || ''
+
+      const makeBound = (field, label, title) => {
+        const caption = document.createElement('span')
+        caption.className = 'muted'
+        caption.style.margin = label === '从' ? '0 6px 0 0' : '0 6px'
+        caption.textContent = label
+        line.appendChild(caption)
+
+        const node = document.createElement('input')
+        node.type = 'date'
+        node.style.cssText = 'flex:1 1 140px;min-width:130px'
+        node.title = title
+        node.value = row[field]
+        node.onchange = () => { row[field] = node.value }
+        line.appendChild(node)
+      }
+      makeBound('from', '从', '开始日期（不早于）；留空则不设下限')
+      makeBound('to', '到', '结束日期（不晚于）；留空则不设上限')
+    } else {
+      const equals = document.createElement('span')
+      equals.className = 'muted'
+      equals.style.margin = '0 6px'
+      equals.textContent = '等于'
+      line.appendChild(equals)
+
+      const valueNode = buildValueInput(definition, null, row.value)
+      const pickable = valueOptionsOf(row.name).length > 0
+      valueNode.placeholder = pickable ? '点这里选已有取值，也可手输' : '值'
+      valueNode.oninput = () => { row.value = valueNode.value }
+      line.appendChild(valueNode)
+    }
+
+    const remove = document.createElement('button')
+    remove.className = 'danger'
+    remove.textContent = '删除'
+    remove.onclick = () => {
+      attrFilters = attrFilters.filter((item) => item !== row)
+      renderAttrFilters()
+    }
+    line.appendChild(remove)
+
+    box.appendChild(line)
+    if (definition.is_builtin) {
+      const hint = document.createElement('div')
+      hint.className = 'muted'
+      hint.style.margin = '0 0 8px 4px'
+      hint.textContent = '时间范围：两端都填 = 之间；只填一端 = 单边限制；两端都留空则该条件不参与筛选'
+      box.appendChild(hint)
+    }
+  })
+}
+
+function addAttrFilter() {
+  if (!definitions.length) { alert('属性库为空：请先点「新建属性…」创建'); return }
+  attrFilters.push({ name: definitions[0].name, value: '' })
+  renderAttrFilters()
+}
+
+function clearAttrFilters() {
+  attrFilters = []
+  renderAttrFilters()
+}
+
+function collectAttrConditions() {
+  const conditions = []
+  attrFilters.forEach((row) => {
+    const definition = definitionOf(row.name)
+    if (!definition) return
+    if (definition.is_builtin) {
+      // 内置「日期」是唯一能按范围比的属性：两端各出一条，条件之间是「并且」
+      if (row.from) conditions.push(`${row.name}>=${row.from}`)
+      if (row.to) conditions.push(`${row.name}<=${row.to}`)
+      return
+    }
+    const value = row.value
+    if (value === undefined || value === null || value === '') return
+    conditions.push(`${row.name}=${value}`)   // 普通属性只有「等于」
+  })
+  return conditions
+}
+
+// ------------------------------------------------------------------ 新建属性
+// 三个去向：上传页→加入本次关联；数据查询页→加入属性条件；属性管理页→只建、不挂到别处
+const NEW_ATTR_GOAL = {
+  upload: { button: '保存并关联', hint: '保存后保留在属性库，并立即加入本次关联' },
+  filter: { button: '保存并加入条件', hint: '保存后保留在属性库，并立即加入筛选条件' },
+  library: { button: '保存', hint: '保存后保留在属性库，上传与检索处即可直接复用' },
+}
+
+function openNewAttr(target) {
+  newAttrTarget = NEW_ATTR_GOAL[target] ? target : 'upload'
+  const goal = NEW_ATTR_GOAL[newAttrTarget]
+  const card = el('newAttrCard')
+  card.style.display = 'block'
+  el('newAttrName').value = ''
+  el('newAttrHint').textContent = goal.hint
+  el('newAttrSave').textContent = goal.button
+  card.scrollIntoView({ block: 'center' })
+  el('newAttrName').focus()
+}
+
+function closeNewAttr() {
+  el('newAttrCard').style.display = 'none'
+}
+
+async function saveNewAttr() {
+  const name = el('newAttrName').value.trim()
+  if (!name) { el('newAttrHint').textContent = '请填写属性名称'; return }
+  if (/[=]/.test(name)) {
+    el('newAttrHint').textContent = '属性名称里不能出现 =（筛选条件里用它分隔属性名和值）'
+    return
+  }
+  try {
+    const data = await request('POST', '/attributes/resolve', {
+      body: { names: [name] },
+    })
+    const definition = data.items[0]
+    const created = data.created.includes(name)
+    await loadDefinitions()
+    const fresh = definitions.find((item) => item.name === name) || definition
+    if (newAttrTarget === 'filter') {
+      if (!attrFilters.some((row) => row.name === name)) {
+        attrFilters.push({ name, value: '', from: '', to: '' })
+        renderAttrFilters()
+      }
+    } else if (newAttrTarget === 'upload') {
+      if (fresh.is_builtin) {
+        // 内置「日期」有自己的一行控件、不进复选框清单，把光标带过去比塞进清单更直观
+        const dateNode = document.getElementById('uploadDate')
+        if (dateNode) { dateNode.scrollIntoView({ block: 'center' }); dateNode.focus() }
+        el('newAttrHint').textContent = '「日期」是内置属性，已在关联属性面板单独一行（默认今天，可改）'
+        return
+      }
+      if (!selectedAttrs.some((item) => item.name === name)) {
+        selectedAttrs.push(fresh)
+        renderAttrValues()
+      }
+    }
+    // newAttrTarget === 'library'：属性管理页只负责"建"，不自动往别处加（loadDefinitions 已刷新列表）
+    el('newAttrHint').textContent = created
+      ? `已新建「${name}」并保留到属性库`
+      : `属性库已有「${name}」，已直接复用`
+  } catch (error) {
+    el('newAttrHint').textContent = '保存失败：' + error.message
+  }
+}
+
+// ------------------------------------------------------------------ 启动
+;(async () => {
+  showPage(pageFromHash(), true)     // 先把页面切好，避免初始化期间三个区域同时露出来
+  const dateNode = document.getElementById('uploadDate')
+  if (dateNode && !dateNode.value) dateNode.value = todayText()   // 内置「日期」默认带今天
+  try {
+    await loadDefinitions()
+    await reload(1)
+  } catch (error) {
+    alert('初始化失败：' + error.message)
+  }
+})()
+
+// 手改地址栏 / 浏览器前进后退也要跟着切页
+window.addEventListener('hashchange', () => showPage(pageFromHash(), true))
+</script>
+</body>
+</html>

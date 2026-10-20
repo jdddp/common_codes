@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>在线查看 · 数据资产管理平台</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --border:#262b36; --text:#e6e8ee; --muted:#8b93a7;
+    --accent:#3f8cff;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px;
+    background:var(--panel); border-bottom:1px solid var(--border); }
+  header h1 { font-size:15px; margin:0; font-weight:600; }
+  header .spacer { flex:1; }
+  header .muted { color:var(--muted); font-size:12px; }
+  .layout { display:flex; gap:12px; padding:12px; align-items:flex-start; }
+  .side { flex:0 0 230px; background:var(--panel); border:1px solid var(--border);
+    border-radius:6px; padding:10px; }
+  .side h2 { font-size:13px; margin:0 0 8px; color:var(--muted); font-weight:600; }
+  .algo { display:flex; align-items:center; gap:6px; padding:2px 0; font-size:13px; }
+  .algo input { accent-color:var(--accent); }
+  .main { flex:1; min-width:0; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:8px 10px;
+    background:var(--panel); border:1px solid var(--border); border-radius:6px; margin-bottom:10px; }
+  button, select, input[type="number"] { background:#20242e; color:var(--text);
+    border:1px solid var(--border); border-radius:4px; padding:4px 9px; font-size:13px; cursor:pointer; }
+  button:hover, select:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  label.field { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+  input[type="range"] { width:130px; accent-color:var(--accent); }
+  input[type="number"] { width:74px; }
+  .value { font-family:Consolas,monospace; font-size:12px; color:#9fd7ff; min-width:36px; }
+  .panels { display:flex; gap:12px; }
+  .panel { flex:1 1 0; min-width:0; background:var(--panel); border:1px solid var(--border);
+    border-radius:6px; padding:8px; }
+  .panel .title { display:flex; justify-content:space-between; font-size:12px; color:var(--muted);
+    margin-bottom:6px; }
+  /* 画布高度由 JS 按「视口底部 − 工具栏上沿 − 下方信息区」算出来，让整幅图不滚动就看得全；
+     下面这行是 JS 跑起来之前的兜底值，免得首屏塌掉。 */
+  .canvas { position:relative; overflow:auto; background:#05070a; border-radius:4px;
+    min-height:160px; height:clamp(160px, calc(100vh - 360px), 900px); }
+  /* .stage 紧贴图像（宽高由 JS 按当前缩放写死在 <img> 上），鼠标十字线定位在它里面，
+     于是百分比永远相对图像本身，放大缩小/居中/滚动都不会错位。
+     width:fit-content 让它收缩到图像宽度，margin:auto 才能水平居中——
+     纯 display:block + margin:auto 是无效的：块级 width:auto 会填满容器，根本谈不上居中。
+     纵向不居中是刻意的：块级的 margin-top/bottom:auto 在常规流里恒为 0，
+     真要纵向居中就得上 flex/grid，而那在内容溢出时会把左上角裁得滚不过去。 */
+  .stage { position:relative; display:block; width:fit-content; margin:auto; line-height:0; }
+  /* 这里刻意不写 width:100% —— 那样图像永远被撑满面板宽度，
+     浏览器 Ctrl+± 整体等比缩放对取景毫无作用，高图（扇形映射后 1397 行）还会顶出视口。 */
+  .canvas img { display:block; image-rendering:pixelated; cursor:crosshair; user-select:none; }
+  .cross { position:absolute; width:18px; height:18px; border-radius:50%;
+    border-left:1px dashed rgba(255,255,255,.8); border-top:1px dashed rgba(255,255,255,.8);
+    transform:translate(-50%,-50%); pointer-events:none; }
+  .readout { font-family:Consolas,monospace; font-size:12px; color:#9fd7ff; margin-top:6px; min-height:18px; }
+  .meta { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:4px 12px;
+    font-size:12px; color:var(--muted); margin-top:10px; padding:10px;
+    background:var(--panel); border:1px solid var(--border); border-radius:6px; }
+  .meta b { color:var(--text); font-weight:500; }
+  .hint { color:var(--muted); font-size:12px; }
+  .error { color:#ff8080; }
+  /* 窄屏时两栏上下堆叠：并排时每栏只剩四五百像素，图会被压得看不清 */
+  @media (max-width: 980px) { .panels { flex-direction:column; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>在线查看</h1>
+  <span class="hint" id="fileName">加载中…</span>
+  <div class="spacer"></div>
+  <span class="hint" id="status">就绪</span>
+  <a href="/" style="color:var(--accent);font-size:12px;text-decoration:none">返回首页</a>
+</header>
+
+<div class="layout">
+  <aside class="side">
+    <h2>算法链（逐帧·无状态）</h2>
+    <div id="algoList"></div>
+    <div class="hint" style="margin-top:8px;line-height:1.6">
+      顺序即执行顺序：截断 → 亮度 → 对比 → Gamma → CLAHE → 背景校正 → 扇形映射
+    </div>
+    <button style="margin-top:10px" onclick="clearAlgorithms()">清空算法</button>
+  </aside>
+
+  <div class="main">
+    <div class="toolbar">
+      <button onclick="stopPlayback()">停止</button>
+      <button onclick="stepFrame(-1)">上一帧</button>
+      <button id="playBtn" class="primary" onclick="togglePlay()">播放</button>
+      <button onclick="stepFrame(1)">下一帧</button>
+      <label class="field">帧
+        <input type="number" id="frameInput" min="1" value="1" onchange="jumpTo(this.value)" />
+        <span id="frameCount">/ 0</span>
+      </label>
+      <label class="field">倍速
+        <select id="speedSelect" onchange="onSpeedChange()">
+          <option>0.25</option><option>0.5</option><option selected>1</option>
+          <option>2</option><option>4</option><option>8</option>
+        </select>
+      </label>
+      <span class="hint" id="intervalHint"></span>
+      <input type="range" id="frameSlider" min="1" max="1" value="1"
+             oninput="pausePlayback()" onchange="jumpTo(this.value)" />
+    </div>
+
+    <div class="toolbar">
+      <label class="field">伪彩
+        <select id="colormapSelect" onchange="onParamsChanged()"></select>
+      </label>
+      <label class="field">亮度
+        <input type="range" id="brightness" min="-100" max="100" value="0"
+               oninput="onAdjustInput()" onchange="onParamsChanged()" />
+        <span class="value" id="brightnessValue">0</span>
+      </label>
+      <label class="field">对比度
+        <input type="range" id="contrast" min="10" max="300" value="100"
+               oninput="onAdjustInput()" onchange="onParamsChanged()" />
+        <span class="value" id="contrastValue">1.00</span>
+      </label>
+      <label class="field">
+        <input type="checkbox" id="sectorFan" onchange="onParamsChanged()" /> 扇形映射
+      </label>
+      <button onclick="resetDisplay()">重置显示</button>
+      <label class="field">缩放
+        <select id="zoomSelect" onchange="onZoomChange()">
+          <option value="fit" selected>适应窗口</option>
+          <option value="0.25">25%</option>
+          <option value="0.5">50%</option>
+          <option value="1">100%</option>
+          <option value="2">200%</option>
+          <option value="4">400%</option>
+          <option value="8">800%</option>
+        </select>
+      </label>
+      <span class="value" id="zoomHint">—</span>
+      <span class="hint">Ctrl+滚轮也能缩放</span>
+      <span class="hint" id="protocolTag"></span>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="title"><span>灰度（原始数据，不跑算法）</span><span id="shapeTag"></span></div>
+        <div class="hint" id="graySizeTag" style="font-size:11px"></div>
+        <div class="canvas" id="grayCanvas">
+          <div class="stage">
+            <img id="grayImage" alt="gray" />
+            <div class="cross" id="grayCross" style="display:none"></div>
+          </div>
+        </div>
+        <div class="readout" id="grayReadout">鼠标移到图像上查看原始像素值</div>
+      </div>
+      <div class="panel">
+        <div class="title"><span>伪彩（算法链 + 伪彩）</span><span id="pingTag"></span></div>
+        <div class="hint" id="colorSizeTag" style="font-size:11px"></div>
+        <div class="canvas" id="colorCanvas">
+          <div class="stage">
+            <img id="colorImage" alt="color" />
+            <div class="cross" id="colorCross" style="display:none"></div>
+          </div>
+        </div>
+        <div class="readout" id="colorReadout">鼠标移到图像上查看算法处理后的数值</div>
+      </div>
+    </div>
+
+    <div class="meta" id="metaBox"></div>
+    <p class="hint" id="errorBox"></p>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+//  纯静态查看页（零依赖）：与桌面版 hdy_viewer.py 对齐的关键语义
+//    step = max(1, int(speed))        interval = max(40, int(180 / speed))
+//    灰度栏 = 原始数据（仅亮度/对比）；伪彩栏 = 算法链 + 伪彩（同一亮度/对比）
+//    播放到最后一帧自动停止；上一帧/下一帧会先暂停
+//  帧数据由后端按索引渲染（可缓存、可并发），本页只做显示与播放调度。
+// ============================================================================
+const API = '/api'
+const BASE_INTERVAL = 180
+const MIN_INTERVAL = 40
+const BATCH = 32
+
+const params = new URLSearchParams(location.search)
+const fileId = params.get('file')
+
+let frameCount = 0
+let index = 0
+let playing = false
+let timer = null
+let info = { supported: false }
+let currentFrame = null
+let panelShapes = null
+let paramsSig = ''
+let fetchToken = 0
+let hoverTimer = null
+const buffer = new Map()
+
+const el = (id) => document.getElementById(id)
+
+function setStatus(text) { el('status').textContent = text }
+function setError(text) { el('errorBox').textContent = text || '' }
+
+async function request(path, query) {
+  const url = new URL(API + path, location.origin)
+  Object.entries(query || {}).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return
+    url.searchParams.append(k, v)
+  })
+  const response = await fetch(url)
+  if (!response.ok) {
+    let detail = response.status + ' ' + response.statusText
+    try {
+      const body = await response.json()
+      if (body.detail) detail = body.detail
+    } catch (e) { /* ignore */ }
+    throw new Error(detail)
+  }
+  return response.json()
+}
+
+function currentParams() {
+  return {
+    algos: enabledAlgorithms().join(','),
+    colormap: el('colormapSelect').value || 'gray',
+    brightness: Number(el('brightness').value),
+    contrast: Number(el('contrast').value) / 100,
+    sector_fan: el('sectorFan').checked ? 'true' : 'false',
+  }
+}
+
+function signature(p) {
+  return [p.algos, p.colormap, p.brightness, p.contrast, p.sector_fan].join('|')
+}
+
+function enabledAlgorithms() {
+  return Array.from(document.querySelectorAll('#algoList input:checked')).map((node) => node.value)
+}
+
+function stepSize() { return Math.max(1, Math.trunc(Number(el('speedSelect').value) || 1)) }
+function intervalMs() {
+  const speed = Math.max(0.25, Number(el('speedSelect').value) || 1)
+  return Math.max(MIN_INTERVAL, Math.trunc(BASE_INTERVAL / speed))
+}
+function updateIntervalHint() {
+  el('intervalHint').textContent = intervalMs() + 'ms/帧 · 步长 ' + stepSize()
+}
+
+// ------------------------------------------------------------------ 取帧
+async function fetchBatch(start, step) {
+  const token = ++fetchToken
+  const response = await request(`/sonar/${fileId}/frames`, {
+    ...currentParams(), start, count: BATCH, step,
+  })
+  if (token !== fetchToken) return null
+  response.frames.forEach((frame) => buffer.set(frame.index, frame))
+  return response.frames
+}
+
+async function showFrame(target) {
+  if (!frameCount) return
+  const wanted = Math.max(0, Math.min(Math.trunc(target), frameCount - 1))
+  index = wanted
+  el('frameInput').value = index + 1
+  el('frameSlider').value = index + 1
+
+  if (buffer.has(index)) {
+    paint(buffer.get(index), '缓冲命中')
+    return
+  }
+  const step = playing ? stepSize() : 1
+  try {
+    const frames = await fetchBatch(index, step)
+    if (!frames) return
+    paint(buffer.get(index) || frames[0], `已预取 ${frames.length} 帧`)
+  } catch (error) {
+    pausePlayback()
+    setError('取帧失败：' + error.message)
+  }
+}
+
+function paint(frame, note) {
+  if (!frame) return
+  currentFrame = frame
+  panelShapes = frame.shapes || null
+  el('grayImage').src = `data:${frame.gray.mime};base64,${frame.gray.data}`
+  el('colorImage').src = `data:${frame.color.mime};base64,${frame.color.data}`
+  updateSizeTags(frame)
+  renderMeta(frame.meta)
+  relayout()
+  setStatus(`帧 ${frame.index + 1}/${frameCount}` + (note ? `（${note}）` : ''))
+  if (buffer.size > 96) {
+    for (const key of Array.from(buffer.keys())) {
+      if (key < index - 24) buffer.delete(key)
+    }
+  }
+}
+
+// 两栏画布尺寸可能不同：开启扇形映射后伪彩栏会重采样成更宽的画布（与桌面版一致）
+function panelSize(which) {
+  const shape = panelShapes && panelShapes[which]
+  if (shape && shape.length === 2) return [Number(shape[0]), Number(shape[1])]
+  const image = el(which === 'gray' ? 'grayImage' : 'colorImage')
+  if (image.naturalWidth && image.naturalHeight) return [image.naturalHeight, image.naturalWidth]
+  const fallback = info.image_shape || [1, 1]
+  return [Number(fallback[0]) || 1, Number(fallback[1]) || 1]
+}
+
+function updateSizeTags(frame) {
+  const [gRows, gCols] = panelSize('gray')
+  const [cRows, cCols] = panelSize('color')
+  el('graySizeTag').textContent = `画布 ${gCols} × ${gRows}（列=波束，行=采样）`
+  el('colorSizeTag').textContent = cCols === gCols && cRows === gRows
+    ? '画布与灰度栏一致'
+    : `画布 ${cCols} × ${cRows}（扇形映射重采样，与灰度栏不同）`
+}
+
+// ------------------------------------------------------------------ 布局与缩放
+const ZOOM_STEPS = ['0.25', '0.5', '1', '2', '4', '8']
+
+// 画布高度 = 「视口底部 − 两栏容器上沿 − 下方信息区」留给 .panels 的空间，
+// 再扣掉面板里除画布以外的固定开销（标题、尺寸说明、读数行、内边距）
+// 固定开销用实测值而不写死：窄屏时两栏会堆叠成上下两行，开销正好翻倍，
+// 写死常数就会让下面那行被顶出视口，"适应窗口"也就名不副实了
+function fitCanvasHeight() {
+  const panels = document.querySelector('.panels')
+  if (!panels) return
+  const first = panels.querySelector('.panel')
+  const firstCanvas = first && first.querySelector('.canvas')
+  if (!firstCanvas) return
+
+  const panelsTop = Math.max(0, panels.getBoundingClientRect().top)
+  const below = (el('metaBox') ? el('metaBox').offsetHeight : 0)
+              + (el('errorBox') ? el('errorBox').offsetHeight : 0)
+              + 30                      // 上下 margin 与间隙
+  const available = window.innerHeight - panelsTop - below - 16
+
+  const chrome = Math.max(0, first.offsetHeight - firstCanvas.offsetHeight)
+  const styles = getComputedStyle(panels)
+  const stacked = styles.flexDirection === 'column'
+  const rows = stacked ? 2 : 1
+  const gap = parseFloat(stacked ? styles.rowGap : styles.columnGap) || 12
+
+  const per = Math.floor((available - rows * chrome - (rows - 1) * gap) / rows)
+  const height = Math.max(160, per)
+  document.querySelectorAll('.canvas').forEach((node) => { node.style.height = height + 'px' })
+}
+
+// 缩放比例：fit = 按画布可用区算（整幅图正好放下）；其余 = 相对原始像素的倍数
+function zoomScale(which) {
+  const mode = el('zoomSelect').value
+  const canvas = el(which === 'gray' ? 'grayCanvas' : 'colorCanvas')
+  const [rows, cols] = panelSize(which)
+  if (mode !== 'fit') return Number(mode) || 1
+  // 各减 4px 留余量，避免「正好铺满 → 冒出滚动条 → 可用区变小 → 又算一遍」来回抖动
+  const scale = Math.min((canvas.clientWidth - 4) / cols, (canvas.clientHeight - 4) / rows)
+  return Number.isFinite(scale) && scale > 0 ? scale : 1
+}
+
+// 把缩放写成 <img> 的实际宽高，而不是 transform:scale —— 这样：
+//   1) 放大后产生真实的可滚动区域，滚动条和拖动能用（transform 不改布局，放大了也滚不动）；
+//   2) 悬停取值用的 getBoundingClientRect() 拿到的就是实际显示尺寸，取值不会错位。
+function applyZoom() {
+  for (const which of ['gray', 'color']) {
+    const image = el(which === 'gray' ? 'grayImage' : 'colorImage')
+    const [rows, cols] = panelSize(which)
+    const scale = zoomScale(which)
+    image.style.width = Math.max(1, Math.round(cols * scale)) + 'px'
+    image.style.height = Math.max(1, Math.round(rows * scale)) + 'px'
+  }
+  const [gRows, gCols] = panelSize('gray')
+  const scale = zoomScale('gray')
+  el('zoomHint').textContent =
+    `${scale.toFixed(2)}× · ${Math.round(gCols * scale)}×${Math.round(gRows * scale)} px`
+}
+
+// 顺序必须是「先定画布高度，再算缩放」：fit 依赖画布可用区
+function relayout() { fitCanvasHeight(); applyZoom() }
+
+function onZoomChange() { applyZoom() }
+
+// Ctrl/⌘ + 滚轮按档位逐级缩放；普通滚轮仍然正常滚动画面
+function bindWheelZoom(id) {
+  el(id).addEventListener('wheel', (event) => {
+    if (!event.ctrlKey && !event.metaKey) return
+    event.preventDefault()
+    const select = el('zoomSelect')
+    let i = ZOOM_STEPS.indexOf(select.value)
+    if (i < 0) i = ZOOM_STEPS.indexOf('1')          // 从「适应窗口」切走时以 100% 为起点
+    if (i < 0) i = 2
+    i = Math.max(0, Math.min(ZOOM_STEPS.length - 1, i + (event.deltaY < 0 ? 1 : -1)))
+    select.value = ZOOM_STEPS[i]
+    onZoomChange()
+  }, { passive: false })
+}
+
+function renderMeta(meta) {
+  if (!meta) return
+  el('pingTag').textContent = 'ping ' + meta.ping_num
+  const rows = [
+    ['帧号(1基)', index + 1],
+    ['ping', meta.ping_num],
+    ['波束数', meta.nBeam],
+    ['采样数', meta.nRange],
+    ['量程', fmt(meta.range_m, 2) + ' m'],
+    ['开角', fmt(meta.open_angle_deg, 2) + '°'],
+    ['频率', fmt(meta.frequency, 2) + ' kHz'],
+    ['脉宽', fmt(meta.pluse_width, 2) + ' us'],
+    ['带宽', fmt(meta.band_width, 2) + ' kHz'],
+    ['水深', fmt(meta.water_depth, 2) + ' m'],
+    ['高模式', meta.high_mode ? '是' : '否'],
+    ['时间戳', meta.time_stamp || '-'],
+  ]
+  el('metaBox').innerHTML = rows
+    .map(([label, value]) => `<div>${label}: <b>${value}</b></div>`)
+    .join('')
+}
+
+function fmt(value, digits) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toFixed(digits) : '-'
+}
+
+// ------------------------------------------------------------------ 播放控制
+function togglePlay() { playing ? pausePlayback() : startPlayback() }
+
+function startPlayback() {
+  if (playing || !frameCount) return
+  playing = true
+  el('playBtn').textContent = '暂停'
+  el('playBtn').classList.remove('primary')
+  setStatus('播放中')
+  scheduleTick()
+}
+
+function pausePlayback() {
+  if (!playing) return
+  playing = false
+  el('playBtn').textContent = '播放'
+  el('playBtn').classList.add('primary')
+  if (timer) { clearTimeout(timer); timer = null }
+  setStatus(`已暂停（帧 ${index + 1}）`)
+}
+
+function stopPlayback() {
+  pausePlayback()
+  showFrame(0)
+  setStatus('已停止并回到首帧')
+}
+
+function scheduleTick() {
+  if (timer) clearTimeout(timer)
+  timer = setTimeout(async () => {
+    if (!playing) return
+    const next = index + stepSize()
+    if (next >= frameCount) {
+      await showFrame(frameCount - 1)
+      pausePlayback()
+      setStatus('已播放到最后一帧')
+      return
+    }
+    await showFrame(next)
+    if (playing) scheduleTick()
+  }, intervalMs())
+}
+
+function stepFrame(delta) {
+  pausePlayback()
+  showFrame(index + delta)
+}
+
+function jumpTo(value) { pausePlayback(); showFrame(Number(value) - 1) }
+
+function onSpeedChange() {
+  updateIntervalHint()
+  if (playing) scheduleTick()
+}
+
+function onParamsChanged() {
+  el('brightnessValue').textContent = el('brightness').value
+  el('contrastValue').textContent = (Number(el('contrast').value) / 100).toFixed(2)
+  const signatureNow = signature(currentParams())
+  el('grayReadout').textContent = '鼠标移到图像上查看原始像素值'
+  el('colorReadout').textContent = '鼠标移到图像上查看算法处理后的数值'
+  hideCross('gray'); hideCross('color')
+  if (signatureNow === paramsSig) return
+  paramsSig = signatureNow
+  buffer.clear()
+  fetchToken += 1
+  showFrame(index)
+}
+
+function onAdjustInput() {
+  el('brightnessValue').textContent = el('brightness').value
+  el('contrastValue').textContent = (Number(el('contrast').value) / 100).toFixed(2)
+}
+
+function resetDisplay() {
+  el('brightness').value = 0
+  el('contrast').value = 100
+  el('colormapSelect').value = info.default_colormap || 'viridis'
+  el('sectorFan').checked = false
+  document.querySelectorAll('#algoList input').forEach((node) => { node.checked = false })
+  onParamsChanged()
+}
+
+function clearAlgorithms() {
+  document.querySelectorAll('#algoList input').forEach((node) => { node.checked = false })
+  onParamsChanged()
+}
+
+// ------------------------------------------------------------------ 悬停取值
+function hideCross(which) {
+  if (which === 'gray') el('grayCross').style.display = 'none'
+  if (which === 'color') el('colorCross').style.display = 'none'
+}
+
+function placeCross(which, x, y, rows, cols) {
+  const [r, c] = rows && cols ? [rows, cols] : panelSize(which)
+  const cross = which === 'gray' ? el('grayCross') : el('colorCross')
+  cross.style.display = 'block'
+  cross.style.left = (((x + 0.5) / c) * 100) + '%'
+  cross.style.top = (((y + 0.5) / r) * 100) + '%'
+}
+
+function bindHover(imageId, which) {
+  const image = el(imageId)
+  image.addEventListener('mousemove', (event) => {
+    const rect = image.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+    // 每栏各自按自身画布换算：伪彩栏开启扇形映射后尺寸与灰度栏不同
+    const naturalWidth = image.naturalWidth || rect.width
+    const naturalHeight = image.naturalHeight || rect.height
+    const x = Math.floor(((event.clientX - rect.left) / rect.width) * naturalWidth)
+    const y = Math.floor(((event.clientY - rect.top) / rect.height) * naturalHeight)
+    placeCross(which, x, y, naturalHeight, naturalWidth)
+    const readout = which === 'gray' ? el('grayReadout') : el('colorReadout')
+    readout.textContent = `x=${x} y=${y} · 查询中…`
+    if (hoverTimer) clearTimeout(hoverTimer)
+    hoverTimer = setTimeout(async () => {
+      try {
+        const result = await request(`/sonar/${fileId}/pixel`, {
+          ...currentParams(), index, x, y, panel: which,
+        })
+        const angle = (result.angle_deg === null || result.angle_deg === undefined)
+          ? ''
+          : ` · 波束角=${Number(result.angle_deg).toFixed(2)}°`
+        if (which === 'gray') {
+          el('grayReadout').textContent = `x=${result.x} y=${result.y} · 原始值=${result.raw}` + angle
+        } else {
+          el('colorReadout').textContent =
+            `x=${result.x} y=${result.y} · 处理值=${result.processed === null ? '—' : result.processed}` + angle +
+            (result.processed === null ? '（扇形映射后该坐标不对应原始像素）' : '')
+        }
+      } catch (error) {
+        el(which === 'gray' ? 'grayReadout' : 'colorReadout').textContent = '取值失败：' + error.message
+      }
+    }, 90)
+  })
+  image.addEventListener('mouseleave', () => {
+    hideCross(which)
+  })
+}
+
+// ------------------------------------------------------------------ 键盘
+window.addEventListener('keydown', (event) => {
+  const tag = (event.target.tagName || '').toLowerCase()
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') return
+  if (event.code === 'Space') { event.preventDefault(); togglePlay() }
+  else if (event.code === 'ArrowLeft') { event.preventDefault(); stepFrame(-stepSize()) }
+  else if (event.code === 'ArrowRight') { event.preventDefault(); stepFrame(stepSize()) }
+  else if (event.code === 'Home') { event.preventDefault(); showFrame(0) }
+  else if (event.code === 'End') { event.preventDefault(); showFrame(frameCount - 1) }
+})
+
+// 窗口尺寸变了就重算画布高度与缩放（防抖 120ms，避免拖动过程中反复算）
+let resizeTimer = null
+window.addEventListener('resize', () => {
+  if (resizeTimer) clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(relayout, 120)
+})
+
+// ------------------------------------------------------------------ 初始化
+async function init() {
+  if (!fileId) {
+    setError('缺少 file 参数，请从「文件检索 / 数据集」页面点进查看。')
+    return
+  }
+  bindHover('grayImage', 'gray')
+  bindHover('colorImage', 'color')
+  bindWheelZoom('grayCanvas')
+  bindWheelZoom('colorCanvas')
+  // 图像解码完成后再算一次：后端没回 shapes 时只能靠 naturalWidth
+  for (const id of ['grayImage', 'colorImage']) {
+    el(id).addEventListener('load', () => applyZoom())
+  }
+  updateIntervalHint()
+
+  try {
+    info = await request(`/sonar/${fileId}/info`)
+  } catch (error) {
+    setError('获取文件信息失败：' + error.message)
+    return
+  }
+  el('shapeTag').textContent = (info.image_shape || []).join(' × ')
+  el('protocolTag').textContent = (info.protocol || '').toUpperCase()
+  el('fileName').textContent = '文件 #' + fileId
+
+  el('colormapSelect').innerHTML = (info.colormaps || ['gray'])
+    .map((name) => `<option value="${name}">${name}</option>`).join('')
+  el('colormapSelect').value = info.default_colormap || 'viridis'
+
+  ;(info.algorithms || []).forEach((item) => {
+    const row = document.createElement('label')
+    row.className = 'algo'
+    row.title = item.description || ''
+    row.innerHTML = `<input type="checkbox" value="${item.name}" onchange="onParamsChanged()" /> ${item.name}`
+    el('algoList').appendChild(row)
+  })
+
+  el('sectorFan').disabled = !(info.capabilities && info.capabilities.sector_fan)
+  if (el('sectorFan').disabled) {
+    el('sectorFan').parentElement.title = '该协议不提供波束角，无法扇形映射'
+  }
+
+  if (!info.supported) {
+    setError('该文件暂不支持在线查看：' + (info.reason || '未知格式') + '（原始文件仍可下载）')
+    el('frameCount').textContent = '/ 0'
+    return
+  }
+
+  frameCount = info.frame_count || 0
+  el('frameCount').textContent = '/ ' + frameCount
+  el('frameSlider').max = Math.max(frameCount, 1)
+  paramsSig = signature(currentParams())
+  renderMeta(info.first_frame_meta)
+  await showFrame(0)
+}
+
+init()
+</script>
+</body>
+</html>
